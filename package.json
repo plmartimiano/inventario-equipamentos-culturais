@@ -1,0 +1,9 @@
+{
+  "name": "inventario-api",
+  "version": "1.0.0",
+  "description": "API para upload Google Drive",
+  "main": "api/uploadGoogleDrive.js",
+  "dependencies": {
+    "googleapis": "^118.0.0"
+  }
+}
