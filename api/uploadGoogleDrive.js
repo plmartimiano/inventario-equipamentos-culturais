@@ -1,4 +1,3 @@
-// api/uploadGoogleDrive.js - ULTRA SIMPLES (sem pipe)
 const { google } = require('googleapis');
 
 function getAuthClient() {
