@@ -1,4 +1,4 @@
-// api/uploadGoogleDrive.js - v3.0
+// api/uploadGoogleDrive.js - v3.0 CORRIGIDO
 // Servidor para fazer upload de fotos, documentos e JSON para Google Drive
 // Usando Service Account
 
@@ -48,6 +48,7 @@ async function criarSubpastaEquipamento(nomeSubpasta, pastaParentId) {
       mensagem: `Subpasta '${nomeSubpasta}' criada com sucesso!`
     };
   } catch (erro) {
+    console.error('Erro ao criar subpasta:', erro);
     return {
       sucesso: false,
       erro: erro.message,
@@ -61,38 +62,45 @@ async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
   const auth = getAuthClient();
   const drive = google.drive({ version: 'v3', auth });
 
-  // Decodificar base64
-  const buffer = Buffer.from(conteudoBase64, 'base64');
+  try {
+    // Decodificar base64 para buffer
+    const buffer = Buffer.from(conteudoBase64, 'base64');
+    console.log(`[Upload] Arquivo: ${nomeArquivo}, Tamanho: ${buffer.length} bytes`);
 
-  // Determinar tipo MIME
-  let mimeType = 'application/octet-stream';
-  if (nomeArquivo.toLowerCase().endsWith('.json')) mimeType = 'application/json';
-  else if (nomeArquivo.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
-  else if (nomeArquivo.toLowerCase().endsWith('.jpg') || nomeArquivo.toLowerCase().endsWith('.jpeg')) mimeType = 'image/jpeg';
-  else if (nomeArquivo.toLowerCase().endsWith('.png')) mimeType = 'image/png';
-  else if (nomeArquivo.toLowerCase().endsWith('.gif')) mimeType = 'image/gif';
-  else if (nomeArquivo.toLowerCase().endsWith('.doc')) mimeType = 'application/msword';
-  else if (nomeArquivo.toLowerCase().endsWith('.docx')) mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    // Determinar tipo MIME
+    let mimeType = 'application/octet-stream';
+    if (nomeArquivo.toLowerCase().endsWith('.json')) mimeType = 'application/json';
+    else if (nomeArquivo.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
+    else if (nomeArquivo.toLowerCase().endsWith('.jpg') || nomeArquivo.toLowerCase().endsWith('.jpeg')) mimeType = 'image/jpeg';
+    else if (nomeArquivo.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+    else if (nomeArquivo.toLowerCase().endsWith('.gif')) mimeType = 'image/gif';
 
-  const fileMetadata = {
-    name: nomeArquivo,
-    parents: [pastaId]
-  };
+    const fileMetadata = {
+      name: nomeArquivo,
+      parents: [pastaId]
+    };
 
-  const file = await drive.files.create({
-    resource: fileMetadata,
-    media: {
-      mimeType: mimeType,
-      body: buffer
-    },
-    fields: 'id, webViewLink, mimeType'
-  });
+    // Upload usando Buffer (SEM .pipe())
+    const file = await drive.files.create({
+      resource: fileMetadata,
+      media: {
+        mimeType: mimeType,
+        body: buffer
+      },
+      fields: 'id, webViewLink, mimeType'
+    });
 
-  return {
-    fileId: file.data.id,
-    link: file.data.webViewLink,
-    mimeType: file.data.mimeType
-  };
+    console.log(`[Upload] Sucesso: ${nomeArquivo} -> ${file.data.id}`);
+
+    return {
+      fileId: file.data.id,
+      link: file.data.webViewLink,
+      mimeType: file.data.mimeType
+    };
+  } catch (erro) {
+    console.error(`[Upload] Erro ao enviar ${nomeArquivo}:`, erro.message);
+    throw erro;
+  }
 }
 
 // ============ FUNÇÃO: Upload de JSON ============
@@ -110,6 +118,7 @@ async function uploadJSON(nomeArquivo, conteudoJSON, pastaId) {
       mensagem: `JSON '${nomeArquivo}' salvo com sucesso!`
     };
   } catch (erro) {
+    console.error(`Erro ao salvar JSON:`, erro.message);
     return {
       sucesso: false,
       erro: erro.message,
@@ -130,6 +139,7 @@ async function uploadDocumento(nomeArquivo, conteudoBase64, pastaId) {
       mensagem: `Documento '${nomeArquivo}' salvo com sucesso!`
     };
   } catch (erro) {
+    console.error(`Erro ao salvar documento:`, erro.message);
     return {
       sucesso: false,
       erro: erro.message,
@@ -150,6 +160,7 @@ async function uploadFoto(nomeArquivo, conteudoBase64, pastaId) {
       mensagem: `Foto '${nomeArquivo}' salva com sucesso!`
     };
   } catch (erro) {
+    console.error(`Erro ao salvar foto:`, erro.message);
     return {
       sucesso: false,
       erro: erro.message,
