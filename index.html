@@ -4367,10 +4367,19 @@ async function criarSubpastaEquipamento(tipo, nomeEquipamento, pastaParentId) {
             mode: 'cors'
         });
 
+        console.log('Response status:', response.status);
         const dados = await response.json();
-        return dados.sucesso ? dados.subpastaId : null;
+        console.log('📥 Response da API:', dados);
+        
+        if (dados.sucesso) {
+            console.log('✅ subpastaId retornada:', dados.subpastaId);
+            return dados.subpastaId;
+        } else {
+            console.error('❌ Erro na API:', dados.erro);
+            return null;
+        }
     } catch (erro) {
-        console.error('Erro ao criar subpasta:', erro);
+        console.error('❌ Erro ao criar subpasta:', erro.message);
         return null;
     }
 }
@@ -4379,6 +4388,9 @@ async function criarSubpastaEquipamento(tipo, nomeEquipamento, pastaParentId) {
 async function uploadFoto(nomeArquivo, conteudoBase64, subpastaId) {
     try {
         console.log(`📤 uploadFoto: ${nomeArquivo}`);
+        console.log(`🆔 subpastaId: ${subpastaId}`);
+        console.log(`📊 Base64 length: ${conteudoBase64.length}`);
+        
         const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
             method: 'POST',
             headers: {
@@ -4394,7 +4406,10 @@ async function uploadFoto(nomeArquivo, conteudoBase64, subpastaId) {
             mode: 'cors'
         });
         
+        console.log('Response status:', response.status);
         const resultado = await response.json();
+        console.log('📥 Response da API:', resultado);
+        
         if (resultado.sucesso) {
             console.log(`✅ Foto enviada: ${nomeArquivo}`);
         } else {
@@ -4442,6 +4457,13 @@ async function uploadDocumento(nomeArquivo, conteudoBase64, subpastaId) {
 // Salvar Equipamento V3 (com subpasta + uploads)
 async function salvarEquipamentoV3(tipo, obj) {
     console.log('🔍 salvarEquipamentoV3 chamada:', tipo, obj.nome);
+    
+    // Se municipioAtual está vazio, tentar recuperar do localStorage
+    if (!municipioAtual) {
+        municipioAtual = localStorage.getItem('municipioAtual');
+        console.log('📝 municipioAtual recuperado do localStorage:', municipioAtual);
+    }
+    
     console.log('municipioAtual:', municipioAtual);
     console.log('pastasMunicipio:', pastasMunicipio);
     
@@ -4549,6 +4571,7 @@ function saveMunicipio() {
     
     // Selecionar este município como atual
     municipioAtual = chave;
+    localStorage.setItem('municipioAtual', chave); // ✅ Salvar no localStorage
     dados = municipios[chave].equipamentos;
     
     // Salvar em localStorage
@@ -4670,6 +4693,7 @@ function carregarMunicipio() {
     const chave = select.value;
     if (chave && municipios[chave]) {
         municipioAtual = chave;
+        localStorage.setItem('municipioAtual', chave); // ✅ Salvar no localStorage
         carregarDadosMunicipio();
         loadMunicipio(); // Carregar dados na tela
         atualizarResumoPrincipal();
@@ -4735,6 +4759,7 @@ function loadData() {
     const chaves = Object.keys(municipios);
     if (chaves.length > 0) {
         municipioAtual = chaves[0];
+        localStorage.setItem('municipioAtual', municipioAtual); // ✅ Salvar no localStorage
         carregarDadosMunicipio();
         mostrarAbasEquipamentos(); // MOSTRAR ABAS
     } else {
