@@ -4897,7 +4897,12 @@ function updateLists() {
                 ev.preventDefault();
                 ev.stopPropagation();
                 console.log('Clicou em deletar:', t, e.id, e.nome);
-                abrirModalConfirmar('equipamento', t, e.id, e.nome);
+                // Recuperar pastaId da subpasta para deletar do Drive
+                const chaveSubpasta = `${municipioAtual}_${t}_${e.id}`;
+                let subpastasLocal = JSON.parse(localStorage.getItem('subpastasEquipamentos') || '{}');
+                const pastaId = subpastasLocal[chaveSubpasta];
+                console.log('🗑️ pastaId recuperada:', pastaId);
+                abrirModalConfirmar('equipamento', t, e.id, e.nome, pastaId);
             });
             
             // BOTÃO EDITAR
@@ -5100,9 +5105,9 @@ let equipamentoEmEdicao = { tipo: null, id: null };
 let modalDados = { tipo: null, param1: null, param2: null, param3: null, pastaId: null };
 let modalEmSegundoNivel = false; // Rastrear se já passou do primeiro aviso
 
-function abrirModalConfirmar(tipo, param1, param2, param3) {
-    console.log('Abrindo modal:', tipo, param1, param2, param3);
-    modalDados = { tipo: tipo, param1: param1, param2: param2, param3: param3 };
+function abrirModalConfirmar(tipo, param1, param2, param3, pastaId = null) {
+    console.log('Abrindo modal:', tipo, param1, param2, param3, 'pastaId:', pastaId);
+    modalDados = { tipo: tipo, param1: param1, param2: param2, param3: param3, pastaId: pastaId };
     const modal = document.getElementById('modal-confirmar');
     const titulo = document.getElementById('modal-titulo');
     const mensagem = document.getElementById('modal-mensagem');
