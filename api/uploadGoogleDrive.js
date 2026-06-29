@@ -41,7 +41,9 @@ async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
       throw new Error('Arquivo vazio');
     }
     
+    const { Readable } = require('stream');
     const buffer = Buffer.from(conteudoBase64, 'base64');
+    const stream = Readable.from(buffer);
     
     let mimeType = 'application/octet-stream';
     if (nomeArquivo.endsWith('.jpg') || nomeArquivo.endsWith('.jpeg')) mimeType = 'image/jpeg';
@@ -58,7 +60,7 @@ async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
       },
       media: {
         mimeType: mimeType,
-        body: buffer
+        body: stream
       },
       fields: 'id, webViewLink'
     });
