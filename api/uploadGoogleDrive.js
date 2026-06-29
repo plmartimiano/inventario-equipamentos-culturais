@@ -57,6 +57,56 @@ async function criarPasta(nomePasta, pastaParentId) {
 }
 
 // ============================================
+// FUNÇÃO: DELETAR pasta no Google Drive
+// ============================================
+async function deletarPasta(pastaId) {
+  try {
+    console.log(`🗑️ Deletando pasta: ${pastaId}`);
+    
+    if (!pastaId) {
+      throw new Error('❌ ID da pasta não fornecido');
+    }
+
+    const drive = getAuthClient();
+    
+    // Primeiro, deletar todos os arquivos dentro da pasta
+    console.log(`📋 Buscando arquivos dentro da pasta...`);
+    const arquivos = await drive.files.list({
+      q: `'${pastaId}' in parents and trashed=false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+
+    console.log(`📋 Encontrados ${arquivos.data.files.length} arquivos`);
+
+    // Deletar cada arquivo
+    for (const arquivo of arquivos.data.files) {
+      try {
+        console.log(`🗑️ Deletando arquivo: ${arquivo.name} (${arquivo.id})`);
+        await drive.files.delete({
+          fileId: arquivo.id
+        });
+        console.log(`✅ Arquivo deletado: ${arquivo.name}`);
+      } catch (erroArquivo) {
+        console.error(`⚠️ Erro ao deletar arquivo ${arquivo.name}:`, erroArquivo.message);
+      }
+    }
+
+    // Agora deletar a pasta
+    console.log(`🗑️ Deletando pasta: ${pastaId}`);
+    await drive.files.delete({
+      fileId: pastaId
+    });
+
+    console.log(`✅ Pasta deletada: ${pastaId}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Erro em deletarPasta:', error.message);
+    throw error;
+  }
+}
+
+// ============================================
 // FUNÇÃO: Upload de arquivo
 // ============================================
 async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
@@ -232,6 +282,24 @@ module.exports = async (req, res) => {
     }
 
     // ============================================
+    // AÇÃO: deletar-pasta (NOVO!)
+    // ============================================
+    if (acao === 'deletar-pasta') {
+      if (!pastaId) {
+        return res.status(400).json({ 
+          erro: 'Faltam parâmetros: pastaId',
+          recebido: { pastaId }
+        });
+      }
+
+      await deletarPasta(pastaId);
+      return res.status(200).json({ 
+        sucesso: true,
+        mensagem: `Pasta deletada com sucesso`
+      });
+    }
+
+    // ============================================
     // AÇÃO: upload (compatibilidade com versões antigas)
     // ============================================
     if (acao === 'upload') {
@@ -254,7 +322,7 @@ module.exports = async (req, res) => {
     // ============================================
     return res.status(400).json({ 
       erro: `Ação desconhecida: ${acao}`,
-      acoesDisponíveis: ['criar-pasta', 'criar-subpasta', 'upload-foto', 'upload-documento', 'upload']
+      acoesDisponíveis: ['criar-pasta', 'criar-subpasta', 'upload-foto', 'upload-documento', 'deletar-pasta', 'upload']
     });
 
   } catch (error) {
