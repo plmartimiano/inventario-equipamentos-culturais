@@ -946,6 +946,32 @@
             <div class="form-group"><label>Capacidade (pessoas)</label><input type="number" id="auditorio-capacidade"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="auditorio-id-obs" placeholder="Informações adicionais"></textarea></div>
 
+            <!-- Adicionar Fotos - AUDITÓRIO -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="auditorio-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="auditorio-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="auditorio-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('auditorio')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos - AUDITÓRIO -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="auditorio-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="auditorio-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="auditorio-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('auditorio')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
             <!-- PALCO - NOVO -->
             <div class="section-title">🎭 PALCO - NOVO</div>
             <div class="rider-section">
@@ -2111,6 +2137,32 @@
             <div class="form-group"><label>Capacidade Estimada (pessoas)</label><input type="number" id="praca-capacidade"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="praca-id-obs" placeholder="Informações adicionais"></textarea></div>
 
+            <!-- Adicionar Fotos - PRAÇA -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="praca-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="praca-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="praca-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('praca')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos - PRAÇA -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="praca-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="praca-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="praca-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('praca')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
             <!-- 1. ESTRUTURAS CULTURAIS, HISTÓRICAS E ÁREA DE EVENTOS -->
             <div class="section-title">1️⃣ ESTRUTURAS CULTURAIS, HISTÓRICAS E ÁREA DE EVENTOS</div>
 
@@ -2535,6 +2587,32 @@
             <div class="form-group"><label>Capacidade (pessoas)</label><input type="number" id="biblioteca-capacidade"></div>
             <div class="form-group"><label>Quantidade do Acervo (títulos)</label><input type="number" id="biblioteca-acervo-qtd" placeholder="Quantidade total de livros/títulos"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="biblioteca-id-obs" placeholder="Informações adicionais"></textarea></div>
+
+            <!-- Adicionar Fotos - BIBLIOTECA -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="biblioteca-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="biblioteca-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="biblioteca-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('biblioteca')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos - BIBLIOTECA -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="biblioteca-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="biblioteca-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="biblioteca-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('biblioteca')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
 
             <!-- 1. SISTEMAS DE TECNOLOGIA, PESQUISA E CONSULTA -->
             <div class="section-title">1️⃣ SISTEMAS DE TECNOLOGIA, PESQUISA E CONSULTA</div>
@@ -3124,6 +3202,32 @@
             <div class="form-group"><label>Responsável</label><input type="text" id="ginasio-responsavel"></div>
             <div class="form-group"><label>Capacidade Total (pessoas)</label><input type="number" id="ginasio-capacidade"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="ginasio-id-obs" placeholder="Informações adicionais"></textarea></div>
+
+            <!-- Adicionar Fotos - GINÁSIO -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="ginasio-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="ginasio-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="ginasio-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('ginasio')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos - GINÁSIO -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="ginasio-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="ginasio-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="ginasio-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('ginasio')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
 
             <!-- 1. VIABILIDADE E PROTEÇÃO DA QUADRA -->
             <div class="section-title">1️⃣ VIABILIDADE E PROTEÇÃO DA QUADRA</div>
@@ -4462,6 +4566,12 @@ function saveMunicipio() {
         mostrarAbasEquipamentos(); // MOSTRAR ABAS DE EQUIPAMENTOS
         ocultarFormularioMunicipio(); // OCULTAR FORMULÁRIO
         showTab('menu');
+        // ✅ ATUALIZAR INTERFACE APÓS CRIAR MUNICÍPIO
+        setTimeout(() => {
+            updateLists();
+            atualizarDropdownMunicipios();
+            console.log('✅ Interface atualizada após novo município');
+        }, 500);
     }, 1000);
 }
 
@@ -5315,8 +5425,18 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Confirmação final clicada');
             if (modalDados.tipo === 'equipamento') {
                 deleteEspacoConfirmado(modalDados.param1, modalDados.param2);
+                // ✅ ATUALIZAR INTERFACE APÓS DELETAR EQUIPAMENTO
+                setTimeout(() => {
+                    updateLists();
+                    console.log('✅ Interface atualizada após deletar equipamento');
+                }, 300);
             } else if (modalDados.tipo === 'municipio') {
                 deletarMunicipioConfirmado(modalDados.param1);
+                // ✅ ATUALIZAR INTERFACE APÓS DELETAR MUNICÍPIO
+                setTimeout(() => {
+                    atualizarDropdownMunicipios();
+                    console.log('✅ Interface atualizada após deletar município');
+                }, 300);
             }
             fecharModal();
         });
