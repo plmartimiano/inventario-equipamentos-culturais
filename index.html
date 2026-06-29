@@ -5097,7 +5097,8 @@ function atualizarResumoPrincipal() {
 // ========== SISTEMA DE MODAL DE CONFIRMAÇÃO ==========
 let equipamentoEmEdicao = { tipo: null, id: null };
 
-let modalDados = { tipo: null, param1: null, param2: null, param3: null };
+let modalDados = { tipo: null, param1: null, param2: null, param3: null, pastaId: null };
+let modalEmSegundoNivel = false; // Rastrear se já passou do primeiro aviso
 
 function abrirModalConfirmar(tipo, param1, param2, param3) {
     console.log('Abrindo modal:', tipo, param1, param2, param3);
@@ -5122,14 +5123,44 @@ function abrirModalConfirmar(tipo, param1, param2, param3) {
 
 function fecharModal() {
     const modal = document.getElementById('modal-confirmar');
+    const modalFinal = document.getElementById('modal-confirmar-final');
     if (modal) {
         modal.style.display = 'none';
     }
-    modalDados = { tipo: null, param1: null, param2: null, param3: null };
+    if (modalFinal) {
+        modalFinal.style.display = 'none';
+    }
+    modalDados = { tipo: null, param1: null, param2: null, param3: null, pastaId: null };
+    modalEmSegundoNivel = false;
+}
+
+// NOVO: Mostrar segundo modal (confirmação final)
+function mostrarModalFinal() {
+    const modalFinal = document.getElementById('modal-confirmar-final');
+    const mensagemFinal = document.getElementById('modal-final-mensagem');
+    
+    if (modalDados.tipo === 'equipamento') {
+        mensagemFinal.textContent = 'Tem certeza absoluta que deseja deletar "' + modalDados.param3 + '" e TODOS os seus arquivos do Google Drive? Esta ação é IRREVERSÍVEL!';
+    } else if (modalDados.tipo === 'municipio') {
+        mensagemFinal.textContent = 'Tem certeza absoluta que deseja deletar o município "' + modalDados.param3 + '", TODOS OS EQUIPAMENTOS e TODOS OS ARQUIVOS do Google Drive? Esta ação é IRREVERSÍVEL!';
+    }
+    
+    if (modalFinal) {
+        modalFinal.style.display = 'flex';
+    }
 }
 
 function confirmarDelete() {
     console.log('Confirmando delete:', modalDados);
+    
+    // Se não passou do primeiro aviso, mostrar segundo aviso
+    if (!modalEmSegundoNivel) {
+        modalEmSegundoNivel = true;
+        mostrarModalFinal();
+        return;
+    }
+    
+    // Se passou para segundo aviso, efetuar a deleção
     if (modalDados.tipo === 'equipamento') {
         deleteEspacoConfirmado(modalDados.param1, modalDados.param2);
     } else if (modalDados.tipo === 'municipio') {
@@ -5138,7 +5169,7 @@ function confirmarDelete() {
     fecharModal();
 }
 
-function deleteEspacoConfirmado(t, id) {
+async function deleteEspacoConfirmado(t, id) {
     console.log('Deletando equipamento:', t, id);
     if (!municipioAtual || !municipios[municipioAtual]) {
         showMsg('⚠️ Nenhum município selecionado!');
@@ -5150,28 +5181,91 @@ function deleteEspacoConfirmado(t, id) {
         return;
     }
     
-    const existente = municipios[municipioAtual].equipamentos[t].some(e => e.id === id);
+    const existente = municipios[municipioAtual].equipamentos[t].find(e => e.id === id);
     if (!existente) {
         showMsg('⚠️ Equipamento não encontrado');
         return;
     }
     
+    // ✅ NOVO: Deletar do Google Drive também
+    if (modalDados.pastaId) {
+        console.log('🗑️ Deletando pasta do Google Drive:', modalDados.pastaId);
+        try {
+            const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    acao: 'deletar-pasta',
+                    pastaId: modalDados.pastaId
+                }),
+                mode: 'cors'
+            });
+
+            const resultado = await response.json();
+            if (resultado.sucesso) {
+                console.log('✅ Pasta deletada do Google Drive');
+            } else {
+                console.error('❌ Erro ao deletar pasta:', resultado.erro);
+                showMsg('⚠️ Aviso: Equipamento deletado localmente, mas houve erro ao deletar no Google Drive');
+            }
+        } catch (erro) {
+            console.error('❌ Erro ao conectar com servidor:', erro);
+            showMsg('⚠️ Aviso: Equipamento deletado localmente, mas houve erro ao deletar no Google Drive');
+        }
+    }
+    
+    // Deletar do localStorage
     municipios[municipioAtual].equipamentos[t] = 
         municipios[municipioAtual].equipamentos[t].filter(e => e.id !== id);
     dados = municipios[municipioAtual].equipamentos;
     saveData();
     updateLists();
-    showMsg('✓ Equipamento deletado com sucesso!');
+    showMsg('✓ Equipamento deletado com sucesso (local e Google Drive)!');
 }
 
-function deletarMunicipioConfirmado(chave) {
+async function deletarMunicipioConfirmado(chave) {
     console.log('Deletando município:', chave);
     if (!chave || !municipios[chave]) {
         showMsg('⚠️ Município não encontrado');
         return;
     }
     
+    // ✅ NOVO: Deletar a pasta do município do Google Drive
+    if (pastasMunicipio[chave]) {
+        const pastaId = pastasMunicipio[chave];
+        console.log('🗑️ Deletando pasta do município do Google Drive:', pastaId);
+        try {
+            const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    acao: 'deletar-pasta',
+                    pastaId: pastaId
+                }),
+                mode: 'cors'
+            });
+
+            const resultado = await response.json();
+            if (resultado.sucesso) {
+                console.log('✅ Pasta do município deletada do Google Drive');
+            } else {
+                console.error('❌ Erro ao deletar pasta do município:', resultado.erro);
+            }
+        } catch (erro) {
+            console.error('❌ Erro ao conectar com servidor:', erro);
+        }
+    }
+    
+    // Deletar do localStorage
     delete municipios[chave];
+    delete pastasMunicipio[chave];
+    localStorage.setItem('pastasMunicipio', JSON.stringify(pastasMunicipio));
     saveData();
     municipioAtual = null;
     dados = {};
@@ -5179,7 +5273,7 @@ function deletarMunicipioConfirmado(chave) {
     atualizarDropdownMunicipios();
     const resumo = document.getElementById('resumo-municipio');
     if (resumo) resumo.style.display = 'none';
-    showMsg('✓ Município deletado com sucesso!');
+    showMsg('✓ Município deletado com sucesso (local e Google Drive)!');
 }
 
 // Aguardar DOM estar pronto antes de carregar dados
@@ -5204,6 +5298,29 @@ document.addEventListener('DOMContentLoaded', function() {
         btnConfirmar.addEventListener('click', function() {
             console.log('Confirmar clicado');
             confirmarDelete();
+        });
+    }
+
+    // ✅ NOVO: Event listeners para o segundo modal (duplo aviso)
+    const btnFinalConfirmar = document.getElementById('modal-final-confirmar-btn');
+    const btnFinalCancelar = document.getElementById('modal-final-cancelar');
+    
+    if (btnFinalConfirmar) {
+        btnFinalConfirmar.addEventListener('click', function() {
+            console.log('Confirmação final clicada');
+            if (modalDados.tipo === 'equipamento') {
+                deleteEspacoConfirmado(modalDados.param1, modalDados.param2);
+            } else if (modalDados.tipo === 'municipio') {
+                deletarMunicipioConfirmado(modalDados.param1);
+            }
+            fecharModal();
+        });
+    }
+    
+    if (btnFinalCancelar) {
+        btnFinalCancelar.addEventListener('click', function() {
+            console.log('Cancelamento final clicado');
+            fecharModal();
         });
     }
 });
@@ -5253,11 +5370,33 @@ document.addEventListener('change', function(e) {
 <!-- MODAL DE CONFIRMAÇÃO DE DELETE -->
 <div id="modal-confirmar" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
     <div style="background:white; padding:30px; border-radius:12px; max-width:400px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
-        <h3 style="margin-top:0; color:#333;" id="modal-titulo">Confirmar Exclusão</h3>
+        <h3 style="margin-top:0; color:#333;" id="modal-titulo">⚠️ Confirmar Exclusão</h3>
         <p style="color:#666; margin:15px 0;" id="modal-mensagem">Tem certeza que deseja deletar este item?</p>
         <div style="display:flex; gap:10px; margin-top:20px;">
             <button id="modal-cancelar" style="flex:1; padding:10px; background:#999; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Cancelar</button>
-            <button id="modal-confirmar-btn" style="flex:1; padding:10px; background:#dc3545; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Deletar</button>
+            <button id="modal-confirmar-btn" style="flex:1; padding:10px; background:#dc3545; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Continuar</button>
+        </div>
+    </div>
+</div>
+
+<!-- SEGUNDO MODAL - Confirmação Final (Duplo Aviso) -->
+<div id="modal-confirmar-final" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:10001; align-items:center; justify-content:center;">
+    <div style="background:#fff3cd; padding:40px; border-radius:10px; max-width:450px; box-shadow:0 4px 30px rgba(0,0,0,0.4); border: 3px solid #ff6b6b;">
+        <h2 style="margin-top:0; color:#cc0000; text-align:center;">🔴 ÚLTIMA CHANCE!</h2>
+        <p style="color:#333; margin:20px 0; font-size:16px; line-height:1.6;" id="modal-final-mensagem">Esta ação é IRREVERSÍVEL!</p>
+        <div style="background:#ffcccc; padding:15px; border-radius:6px; margin:20px 0; border-left: 4px solid #ff0000;">
+            <p style="margin:5px 0; font-weight:bold; color:#cc0000;">⚠️ Será deletado:</p>
+            <ul style="margin:10px 0; padding-left:20px; color:#666;">
+                <li>O equipamento/município</li>
+                <li>Todas as fotos</li>
+                <li>Todos os documentos</li>
+                <li>A pasta no Google Drive</li>
+            </ul>
+        </div>
+        <p style="color:#cc0000; font-weight:bold; text-align:center; margin:20px 0;">Confirme novamente se tem certeza absoluta:</p>
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button id="modal-final-cancelar" style="flex:1; padding:12px; background:#999; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Não, Cancelar</button>
+            <button id="modal-final-confirmar-btn" style="flex:1; padding:12px; background:#cc0000; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">SIM, DELETAR PARA SEMPRE</button>
         </div>
     </div>
 </div>
