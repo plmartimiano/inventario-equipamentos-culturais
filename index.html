@@ -4441,41 +4441,64 @@ async function uploadDocumento(nomeArquivo, conteudoBase64, subpastaId) {
 
 // Salvar Equipamento V3 (com subpasta + uploads)
 async function salvarEquipamentoV3(tipo, obj) {
-    if (!municipioAtual || !pastasMunicipio[municipioAtual]) return;
+    console.log('🔍 salvarEquipamentoV3 chamada:', tipo, obj.nome);
+    console.log('municipioAtual:', municipioAtual);
+    console.log('pastasMunicipio:', pastasMunicipio);
+    
+    if (!municipioAtual || !pastasMunicipio[municipioAtual]) {
+        console.error('❌ ERRO: municipioAtual ou pasta não existem!');
+        console.log('municipioAtual:', municipioAtual, 'existe?', !!municipioAtual);
+        console.log('pastasMunicipio[municipioAtual]:', pastasMunicipio[municipioAtual]);
+        return;
+    }
     
     try {
         const chaveSubpasta = `${municipioAtual}_${tipo}_${obj.id}`;
+        console.log('📝 chaveSubpasta:', chaveSubpasta);
         let subpastasLocal = JSON.parse(localStorage.getItem('subpastasEquipamentos') || '{}');
         let subpastaId = subpastasLocal[chaveSubpasta];
+        console.log('subpastaId encontrada:', subpastaId);
         
         // Criar subpasta se não existir
         if (!subpastaId) {
+            console.log('📁 Criando subpasta...');
             subpastaId = await criarSubpastaEquipamento(tipo, obj.nome, pastasMunicipio[municipioAtual]);
             if (subpastaId) {
                 subpastasLocal[chaveSubpasta] = subpastaId;
                 localStorage.setItem('subpastasEquipamentos', JSON.stringify(subpastasLocal));
+                console.log('✅ Subpasta criada:', subpastaId);
             }
         }
         
         if (subpastaId) {
             // Upload de fotos
             if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
+                console.log('📷 Começando upload de', fotosTemporarias[tipo].length, 'fotos');
                 for (const foto of fotosTemporarias[tipo]) {
+                    console.log('📤 Uploadando foto:', foto.descricao);
                     await uploadFoto(`${foto.descricao.replace(/\s+/g, '_')}_${Date.now()}.jpg`, foto.base64, subpastaId);
                 }
                 fotosTemporarias[tipo] = [];
+            } else {
+                console.log('ℹ️ Nenhuma foto para upload');
             }
             
             // Upload de documentos
             if (documentosTemporarios[tipo] && documentosTemporarios[tipo].length > 0) {
+                console.log('📄 Começando upload de', documentosTemporarios[tipo].length, 'documentos');
                 for (const doc of documentosTemporarios[tipo]) {
+                    console.log('📤 Uploadando doc:', doc.descricao);
                     await uploadDocumento(`${doc.descricao.replace(/\s+/g, '_')}_${Date.now()}.pdf`, doc.base64, subpastaId);
                 }
                 documentosTemporarios[tipo] = [];
+            } else {
+                console.log('ℹ️ Nenhum documento para upload');
             }
+        } else {
+            console.error('❌ Não conseguiu criar ou recuperar subpastaId');
         }
     } catch (erro) {
-        console.error('Erro em salvarEquipamentoV3:', erro);
+        console.error('❌ Erro em salvarEquipamentoV3:', erro);
     }
 }
 
