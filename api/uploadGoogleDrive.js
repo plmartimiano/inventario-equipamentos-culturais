@@ -48,66 +48,16 @@ async function criarPasta(nomePasta, pastaParentId) {
       fields: 'id, name'
     });
 
-    console.log(`✅ Pasta criada: ${response.data.name} (ID: ${response.data.id})`);
+    console.log(`✅ Pasta criada:`, response.data.id);
     return response.data.id;
   } catch (error) {
     console.error('❌ Erro em criarPasta:', error.message);
-    throw error;
+    throw new Error(`Falha ao criar pasta: ${error.message}`);
   }
 }
 
 // ============================================
-// FUNÇÃO: DELETAR pasta no Google Drive
-// ============================================
-async function deletarPasta(pastaId) {
-  try {
-    console.log(`🗑️ Deletando pasta: ${pastaId}`);
-    
-    if (!pastaId) {
-      throw new Error('❌ ID da pasta não fornecido');
-    }
-
-    const drive = getAuthClient();
-    
-    // Primeiro, deletar todos os arquivos dentro da pasta
-    console.log(`📋 Buscando arquivos dentro da pasta...`);
-    const arquivos = await drive.files.list({
-      q: `'${pastaId}' in parents and trashed=false`,
-      fields: 'files(id, name)',
-      spaces: 'drive'
-    });
-
-    console.log(`📋 Encontrados ${arquivos.data.files.length} arquivos`);
-
-    // Deletar cada arquivo
-    for (const arquivo of arquivos.data.files) {
-      try {
-        console.log(`🗑️ Deletando arquivo: ${arquivo.name} (${arquivo.id})`);
-        await drive.files.delete({
-          fileId: arquivo.id
-        });
-        console.log(`✅ Arquivo deletado: ${arquivo.name}`);
-      } catch (erroArquivo) {
-        console.error(`⚠️ Erro ao deletar arquivo ${arquivo.name}:`, erroArquivo.message);
-      }
-    }
-
-    // Agora deletar a pasta
-    console.log(`🗑️ Deletando pasta: ${pastaId}`);
-    await drive.files.delete({
-      fileId: pastaId
-    });
-
-    console.log(`✅ Pasta deletada: ${pastaId}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Erro em deletarPasta:', error.message);
-    throw error;
-  }
-}
-
-// ============================================
-// FUNÇÃO: Upload de arquivo
+// FUNÇÃO: Upload de Arquivo
 // ============================================
 async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
   try {
@@ -115,18 +65,17 @@ async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
     
     // Validar base64
     if (!conteudoBase64 || conteudoBase64.length === 0) {
-      throw new Error('❌ Conteúdo do arquivo está vazio');
+      throw new Error('Conteúdo do arquivo está vazio');
     }
 
     // Converter base64 para Buffer
     let buffer;
     try {
       buffer = Buffer.from(conteudoBase64, 'base64');
+      console.log(`✓ Buffer criado com ${buffer.length} bytes`);
     } catch (bufferError) {
-      throw new Error(`❌ Erro ao converter base64 para Buffer: ${bufferError.message}`);
+      throw new Error(`Erro ao converter base64: ${bufferError.message}`);
     }
-
-    console.log(`✓ Buffer criado com ${buffer.length} bytes`);
 
     const drive = getAuthClient();
 
@@ -157,7 +106,44 @@ async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
     return response.data.webViewLink;
   } catch (error) {
     console.error('❌ Erro em uploadArquivo:', error.message);
-    throw error;
+    throw new Error(`Falha no upload: ${error.message}`);
+  }
+}
+
+// ============================================
+// FUNÇÃO: Deletar Pasta
+// ============================================
+async function deletarPasta(pastaId) {
+  try {
+    console.log(`🗑️ Deletando pasta: ${pastaId}`);
+    
+    const drive = getAuthClient();
+
+    // Listar todos os arquivos dentro da pasta
+    const listResponse = await drive.files.list({
+      q: `'${pastaId}' in parents and trashed=false`,
+      spaces: 'drive',
+      fields: 'files(id, name)',
+      pageSize: 1000
+    });
+
+    const files = listResponse.data.files || [];
+    console.log(`📋 Encontrados ${files.length} arquivos para deletar`);
+
+    // Deletar cada arquivo
+    for (const file of files) {
+      console.log(`🗑️ Deletando arquivo: ${file.name}`);
+      await drive.files.delete({ fileId: file.id });
+    }
+
+    // Deletar a pasta
+    console.log(`🗑️ Deletando pasta...`);
+    await drive.files.delete({ fileId: pastaId });
+    
+    console.log(`✅ Pasta deletada`);
+  } catch (error) {
+    console.error('❌ Erro em deletarPasta:', error.message);
+    throw new Error(`Falha ao deletar pasta: ${error.message}`);
   }
 }
 
@@ -197,10 +183,10 @@ module.exports = async (req, res) => {
       acao,
       nomePasta,
       nomeSubpasta,
-      pastaParentId: pastaParentId?.substring(0, 10) + '...',
+      pastaParentId: pastaParentId?.substring(0, 10) + '...' || 'vazio',
       nomeArquivo,
       conteudoBase64Length: conteudoBase64?.length || 0,
-      pastaId: pastaId?.substring(0, 10) + '...'
+      pastaId: pastaId?.substring(0, 10) + '...' || 'vazio'
     });
 
     // ============================================
@@ -213,19 +199,26 @@ module.exports = async (req, res) => {
         });
       }
 
-      const pastaId = await criarPasta(nomePasta, pastaParentId);
-      return res.status(200).json({ 
-        sucesso: true, 
-        pastaId: pastaId,
-        mensagem: `Pasta "${nomePasta}" criada com sucesso`
-      });
+      try {
+        const pastaId = await criarPasta(nomePasta, pastaParentId);
+        return res.status(200).json({ 
+          sucesso: true, 
+          pastaId: pastaId,
+          mensagem: `Pasta "${nomePasta}" criada com sucesso`
+        });
+      } catch (error) {
+        console.error('❌ Erro ao criar pasta:', error.message);
+        return res.status(500).json({
+          sucesso: false,
+          erro: error.message
+        });
+      }
     }
 
     // ============================================
     // AÇÃO: criar-subpasta (para equipamento)
     // ============================================
     if (acao === 'criar-subpasta') {
-      // Aceita nomePasta ou nomeSubpasta
       const nome = nomeSubpasta || nomePasta;
       
       if (!nome || !pastaParentId) {
@@ -235,12 +228,20 @@ module.exports = async (req, res) => {
         });
       }
 
-      const subpastaId = await criarPasta(nome, pastaParentId);
-      return res.status(200).json({ 
-        sucesso: true, 
-        subpastaId: subpastaId,
-        mensagem: `Subpasta "${nome}" criada com sucesso`
-      });
+      try {
+        const subpastaId = await criarPasta(nome, pastaParentId);
+        return res.status(200).json({ 
+          sucesso: true, 
+          subpastaId: subpastaId,
+          mensagem: `Subpasta "${nome}" criada com sucesso`
+        });
+      } catch (error) {
+        console.error('❌ Erro ao criar subpasta:', error.message);
+        return res.status(500).json({
+          sucesso: false,
+          erro: error.message
+        });
+      }
     }
 
     // ============================================
@@ -250,16 +251,28 @@ module.exports = async (req, res) => {
       if (!nomeArquivo || !conteudoBase64 || !pastaId) {
         return res.status(400).json({ 
           erro: 'Faltam parâmetros: nomeArquivo, conteudoBase64, pastaId',
-          recebido: { nomeArquivo, conteudoBase64Length: conteudoBase64?.length || 0, pastaId }
+          recebido: { 
+            nomeArquivo: nomeArquivo ? 'OK' : 'VAZIO',
+            conteudoBase64Length: conteudoBase64?.length || 0, 
+            pastaId: pastaId ? 'OK' : 'VAZIO'
+          }
         });
       }
 
-      const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
-      return res.status(200).json({ 
-        sucesso: true, 
-        link: link,
-        mensagem: `Foto "${nomeArquivo}" uploadada com sucesso`
-      });
+      try {
+        const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
+        return res.status(200).json({ 
+          sucesso: true, 
+          link: link,
+          mensagem: `Foto "${nomeArquivo}" uploadada com sucesso`
+        });
+      } catch (error) {
+        console.error('❌ Erro ao fazer upload de foto:', error.message);
+        return res.status(500).json({
+          sucesso: false,
+          erro: error.message
+        });
+      }
     }
 
     // ============================================
@@ -269,52 +282,53 @@ module.exports = async (req, res) => {
       if (!nomeArquivo || !conteudoBase64 || !pastaId) {
         return res.status(400).json({ 
           erro: 'Faltam parâmetros: nomeArquivo, conteudoBase64, pastaId',
-          recebido: { nomeArquivo, conteudoBase64Length: conteudoBase64?.length || 0, pastaId }
+          recebido: { 
+            nomeArquivo: nomeArquivo ? 'OK' : 'VAZIO',
+            conteudoBase64Length: conteudoBase64?.length || 0, 
+            pastaId: pastaId ? 'OK' : 'VAZIO'
+          }
         });
       }
 
-      const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
-      return res.status(200).json({ 
-        sucesso: true, 
-        link: link,
-        mensagem: `Documento "${nomeArquivo}" uploadado com sucesso`
-      });
+      try {
+        const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
+        return res.status(200).json({ 
+          sucesso: true, 
+          link: link,
+          mensagem: `Documento "${nomeArquivo}" uploadado com sucesso`
+        });
+      } catch (error) {
+        console.error('❌ Erro ao fazer upload de documento:', error.message);
+        return res.status(500).json({
+          sucesso: false,
+          erro: error.message
+        });
+      }
     }
 
     // ============================================
-    // AÇÃO: deletar-pasta (NOVO!)
+    // AÇÃO: deletar-pasta
     // ============================================
     if (acao === 'deletar-pasta') {
       if (!pastaId) {
         return res.status(400).json({ 
-          erro: 'Faltam parâmetros: pastaId',
-          recebido: { pastaId }
+          erro: 'Faltam parâmetros: pastaId' 
         });
       }
 
-      await deletarPasta(pastaId);
-      return res.status(200).json({ 
-        sucesso: true,
-        mensagem: `Pasta deletada com sucesso`
-      });
-    }
-
-    // ============================================
-    // AÇÃO: upload (compatibilidade com versões antigas)
-    // ============================================
-    if (acao === 'upload') {
-      if (!nomeArquivo || !conteudoBase64 || !pastaId) {
-        return res.status(400).json({ 
-          erro: 'Faltam parâmetros: nomeArquivo, conteudoBase64, pastaId' 
+      try {
+        await deletarPasta(pastaId);
+        return res.status(200).json({ 
+          sucesso: true, 
+          mensagem: `Pasta deletada com sucesso`
+        });
+      } catch (error) {
+        console.error('❌ Erro ao deletar pasta:', error.message);
+        return res.status(500).json({
+          sucesso: false,
+          erro: error.message
         });
       }
-
-      const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
-      return res.status(200).json({ 
-        sucesso: true, 
-        link: link,
-        mensagem: `Arquivo "${nomeArquivo}" uploadado com sucesso`
-      });
     }
 
     // ============================================
@@ -322,18 +336,18 @@ module.exports = async (req, res) => {
     // ============================================
     return res.status(400).json({ 
       erro: `Ação desconhecida: ${acao}`,
-      acoesDisponíveis: ['criar-pasta', 'criar-subpasta', 'upload-foto', 'upload-documento', 'deletar-pasta', 'upload']
+      acoesDisponíveis: ['criar-pasta', 'criar-subpasta', 'upload-foto', 'upload-documento', 'deletar-pasta']
     });
 
   } catch (error) {
-    console.error('\n❌ ERRO NA API:');
+    console.error('\n❌ ERRO GERAL NA API:');
     console.error('Mensagem:', error.message);
     console.error('Stack:', error.stack);
     
-    res.status(500).json({ 
-      erro: 'Erro ao processar requisição',
-      detalhes: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    return res.status(500).json({ 
+      sucesso: false,
+      erro: 'Erro interno do servidor',
+      mensagem: error.message
     });
   }
 };
