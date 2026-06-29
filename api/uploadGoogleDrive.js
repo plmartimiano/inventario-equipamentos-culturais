@@ -1,188 +1,271 @@
-// ========================================
-// SISTEMA DE UPLOAD PARA GOOGLE DRIVE
-// Estrutura: EquipamentosTipo/Fotos e Documentos
-// ========================================
+const { google } = require('googleapis');
 
-const PASTA_PARENT_ID = '1GRA91-gmzF7gev_9IghyhZckGajnsEzB';
-const API_URL = 'https://inventario-equipamentos-paulo.vercel.app/api/uploadGoogleDrive';
+// ============================================
+// FUNÇÃO: Autenticar com Google
+// ============================================
+function getAuthClient() {
+  try {
+    const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    
+    if (!serviceAccountJson) {
+      throw new Error('❌ GOOGLE_SERVICE_ACCOUNT_JSON não configurada na Vercel');
+    }
 
-// Cache local de IDs de pastas criadas
-const pastasCache = JSON.parse(localStorage.getItem('pastasCache') || '{}');
-
-/**
- * Cria uma pasta no Google Drive se não existir
- * @param {string} nomePasta - Nome da pasta a criar
- * @param {string} pastaParentId - ID da pasta pai
- * @returns {Promise<string>} - ID da pasta criada/existente
- */
-async function criarPastaNoGoogle(nomePasta, pastaParentId) {
+    let serviceAccount;
     try {
-        // Verificar se já foi criada (cache)
-        const chaveCache = `${pastaParentId}_${nomePasta}`;
-        if (pastasCache[chaveCache]) {
-            console.log(`✓ Pasta ${nomePasta} já existe (cache): ${pastasCache[chaveCache]}`);
-            return pastasCache[chaveCache];
-        }
+      serviceAccount = JSON.parse(serviceAccountJson);
+    } catch (parseError) {
+      throw new Error(`❌ Erro ao fazer parse do JSON: ${parseError.message}`);
+    }
 
-        // Chamar API para criar
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                acao: 'criar-pasta',
-                nomePasta: nomePasta,
-                pastaParentId: pastaParentId
-            })
+    const auth = new google.auth.GoogleAuth({
+      credentials: serviceAccount,
+      scopes: ['https://www.googleapis.com/auth/drive']
+    });
+
+    return google.drive({ version: 'v3', auth });
+  } catch (error) {
+    console.error('❌ Erro em getAuthClient:', error.message);
+    throw error;
+  }
+}
+
+// ============================================
+// FUNÇÃO: Criar pasta no Google Drive
+// ============================================
+async function criarPasta(nomePasta, pastaParentId) {
+  try {
+    console.log(`📁 Criando pasta: "${nomePasta}" em ${pastaParentId}`);
+    
+    const drive = getAuthClient();
+    
+    const response = await drive.files.create({
+      requestBody: {
+        name: nomePasta,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [pastaParentId]
+      },
+      fields: 'id, name'
+    });
+
+    console.log(`✅ Pasta criada: ${response.data.name} (ID: ${response.data.id})`);
+    return response.data.id;
+  } catch (error) {
+    console.error('❌ Erro em criarPasta:', error.message);
+    throw error;
+  }
+}
+
+// ============================================
+// FUNÇÃO: Upload de arquivo
+// ============================================
+async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
+  try {
+    console.log(`📤 Upload iniciado: ${nomeArquivo} (tamanho base64: ${conteudoBase64.length} chars)`);
+    
+    // Validar base64
+    if (!conteudoBase64 || conteudoBase64.length === 0) {
+      throw new Error('❌ Conteúdo do arquivo está vazio');
+    }
+
+    // Converter base64 para Buffer
+    let buffer;
+    try {
+      buffer = Buffer.from(conteudoBase64, 'base64');
+    } catch (bufferError) {
+      throw new Error(`❌ Erro ao converter base64 para Buffer: ${bufferError.message}`);
+    }
+
+    console.log(`✓ Buffer criado com ${buffer.length} bytes`);
+
+    const drive = getAuthClient();
+
+    // Detectar MIME type
+    let mimeType = 'application/octet-stream';
+    if (nomeArquivo.endsWith('.jpg') || nomeArquivo.endsWith('.jpeg')) mimeType = 'image/jpeg';
+    else if (nomeArquivo.endsWith('.png')) mimeType = 'image/png';
+    else if (nomeArquivo.endsWith('.gif')) mimeType = 'image/gif';
+    else if (nomeArquivo.endsWith('.pdf')) mimeType = 'application/pdf';
+    else if (nomeArquivo.endsWith('.docx')) mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    console.log(`✓ MIME type: ${mimeType}`);
+
+    const response = await drive.files.create({
+      requestBody: {
+        name: nomeArquivo,
+        mimeType: mimeType,
+        parents: [pastaId]
+      },
+      media: {
+        mimeType: mimeType,
+        body: buffer
+      },
+      fields: 'id, name, webViewLink'
+    });
+
+    console.log(`✅ Arquivo uploadado: ${response.data.name} (ID: ${response.data.id})`);
+    return response.data.webViewLink;
+  } catch (error) {
+    console.error('❌ Erro em uploadArquivo:', error.message);
+    throw error;
+  }
+}
+
+// ============================================
+// HANDLER PRINCIPAL
+// ============================================
+module.exports = async (req, res) => {
+  console.log('\n========== NOVA REQUISIÇÃO ==========');
+  console.log(`Método: ${req.method}`);
+  console.log(`Ação: ${req.body?.acao || 'nenhuma'}`);
+  
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ erro: 'Método não permitido' });
+  }
+
+  try {
+    const { 
+      acao, 
+      nomePasta, 
+      nomeSubpasta,
+      pastaParentId, 
+      nomeArquivo, 
+      conteudoBase64, 
+      pastaId 
+    } = req.body;
+
+    console.log(`📋 Dados recebidos:`, {
+      acao,
+      nomePasta,
+      nomeSubpasta,
+      pastaParentId: pastaParentId?.substring(0, 10) + '...',
+      nomeArquivo,
+      conteudoBase64Length: conteudoBase64?.length || 0,
+      pastaId: pastaId?.substring(0, 10) + '...'
+    });
+
+    // ============================================
+    // AÇÃO: criar-pasta (para município)
+    // ============================================
+    if (acao === 'criar-pasta') {
+      if (!nomePasta || !pastaParentId) {
+        return res.status(400).json({ 
+          erro: 'Faltam parâmetros: nomePasta e pastaParentId' 
         });
+      }
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const resultado = await response.json();
-
-        if (resultado.sucesso && resultado.pastaId) {
-            // Guardar no cache
-            pastasCache[chaveCache] = resultado.pastaId;
-            localStorage.setItem('pastasCache', JSON.stringify(pastasCache));
-            console.log(`✓ Pasta criada: ${nomePasta} (${resultado.pastaId})`);
-            return resultado.pastaId;
-        } else {
-            throw new Error(resultado.erro || 'Erro ao criar pasta');
-        }
-    } catch (erro) {
-        console.error(`✗ Erro ao criar pasta ${nomePasta}:`, erro.message);
-        throw erro;
+      const pastaId = await criarPasta(nomePasta, pastaParentId);
+      return res.status(200).json({ 
+        sucesso: true, 
+        pastaId: pastaId,
+        mensagem: `Pasta "${nomePasta}" criada com sucesso`
+      });
     }
-}
 
-/**
- * Faz upload de arquivo para o Google Drive
- * @param {File} arquivo - Arquivo a fazer upload
- * @param {string} nomeArquivo - Nome do arquivo
- * @param {string} pastaId - ID da pasta destino
- * @returns {Promise<string>} - Link do arquivo no Drive
- */
-async function uploadArquivoParaGoogle(arquivo, nomeArquivo, pastaId) {
-    try {
-        // Converter arquivo para base64
-        const base64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const resultado = reader.result.split(',')[1]; // Remove "data:image/png;base64,"
-                resolve(resultado);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(arquivo);
+    // ============================================
+    // AÇÃO: criar-subpasta (para equipamento)
+    // ============================================
+    if (acao === 'criar-subpasta') {
+      // Aceita nomePasta ou nomeSubpasta
+      const nome = nomeSubpasta || nomePasta;
+      
+      if (!nome || !pastaParentId) {
+        return res.status(400).json({ 
+          erro: 'Faltam parâmetros: nomeSubpasta (ou nomePasta) e pastaParentId',
+          recebido: { nome, pastaParentId }
         });
+      }
 
-        // Chamar API para upload
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                acao: 'upload',
-                nomeArquivo: nomeArquivo,
-                conteudoBase64: base64,
-                pastaId: pastaId
-            })
+      const subpastaId = await criarPasta(nome, pastaParentId);
+      return res.status(200).json({ 
+        sucesso: true, 
+        subpastaId: subpastaId,
+        mensagem: `Subpasta "${nome}" criada com sucesso`
+      });
+    }
+
+    // ============================================
+    // AÇÃO: upload-foto
+    // ============================================
+    if (acao === 'upload-foto') {
+      if (!nomeArquivo || !conteudoBase64 || !pastaId) {
+        return res.status(400).json({ 
+          erro: 'Faltam parâmetros: nomeArquivo, conteudoBase64, pastaId',
+          recebido: { nomeArquivo, conteudoBase64Length: conteudoBase64?.length || 0, pastaId }
         });
+      }
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const resultado = await response.json();
-
-        if (resultado.sucesso && resultado.link) {
-            console.log(`✓ Arquivo enviado: ${nomeArquivo}`);
-            return resultado.link;
-        } else {
-            throw new Error(resultado.erro || 'Erro ao fazer upload');
-        }
-    } catch (erro) {
-        console.error(`✗ Erro ao fazer upload ${nomeArquivo}:`, erro.message);
-        throw erro;
+      const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
+      return res.status(200).json({ 
+        sucesso: true, 
+        link: link,
+        mensagem: `Foto "${nomeArquivo}" uploadada com sucesso`
+      });
     }
-}
 
-/**
- * FUNÇÃO PRINCIPAL: Upload de foto com criação automática de estrutura
- * @param {File} arquivo - Arquivo selecionado
- * @param {string} nomeArquivo - Nome do arquivo
- * @param {string} tipoEquipamento - 'teatro', 'auditorio', 'cinema', etc
- * @returns {Promise<string>} - Link do arquivo ou null se erro
- */
-async function uploadFotoParaGoogleDrive(arquivo, nomeArquivo, tipoEquipamento) {
-    try {
-        console.log(`📤 Iniciando upload: ${nomeArquivo} para ${tipoEquipamento}`);
-
-        // Step 1: Criar pasta do tipo (EquipamentosTeatro, EquipamentosCinema, etc)
-        const nomePastaTipo = `Equipamentos${tipoEquipamento.charAt(0).toUpperCase() + tipoEquipamento.slice(1)}`;
-        const pastaTypeId = await criarPastaNoGoogle(nomePastaTipo, PASTA_PARENT_ID);
-
-        // Step 2: Criar subpasta "Fotos"
-        const pastaFotosId = await criarPastaNoGoogle('Fotos', pastaTypeId);
-
-        // Step 3: Upload do arquivo
-        const link = await uploadArquivoParaGoogle(arquivo, nomeArquivo, pastaFotosId);
-
-        console.log(`✅ Upload concluído! Link: ${link}`);
-        return link;
-
-    } catch (erro) {
-        console.error(`❌ Erro no upload:`, erro.message);
-        showMsg(`⚠️ Erro ao enviar arquivo: ${erro.message}`);
-        return null;
-    }
-}
-
-/**
- * FUNÇÃO AUXILIAR: Upload de documentos (mesma lógica, subpasta "Documentos")
- * @param {File} arquivo - Arquivo selecionado
- * @param {string} nomeArquivo - Nome do arquivo
- * @param {string} tipoEquipamento - 'teatro', 'auditorio', 'cinema', etc
- * @returns {Promise<string>} - Link do arquivo ou null se erro
- */
-async function uploadDocumentoParaGoogleDrive(arquivo, nomeArquivo, tipoEquipamento) {
-    try {
-        console.log(`📤 Iniciando upload de documento: ${nomeArquivo} para ${tipoEquipamento}`);
-
-        // Step 1: Criar pasta do tipo
-        const nomePastaTipo = `Equipamentos${tipoEquipamento.charAt(0).toUpperCase() + tipoEquipamento.slice(1)}`;
-        const pastaTypeId = await criarPastaNoGoogle(nomePastaTipo, PASTA_PARENT_ID);
-
-        // Step 2: Criar subpasta "Documentos"
-        const pastaDocumentosId = await criarPastaNoGoogle('Documentos', pastaTypeId);
-
-        // Step 3: Upload do arquivo
-        const link = await uploadArquivoParaGoogle(arquivo, nomeArquivo, pastaDocumentosId);
-
-        console.log(`✅ Documento enviado! Link: ${link}`);
-        return link;
-
-    } catch (erro) {
-        console.error(`❌ Erro ao enviar documento:`, erro.message);
-        showMsg(`⚠️ Erro ao enviar documento: ${erro.message}`);
-        return null;
-    }
-}
-
-// ========================================
-// FUNÇÃO DE TESTE
-// ========================================
-async function testarUpload() {
-    console.log('🧪 Testando conexão com API...');
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                acao: 'test'
-            })
+    // ============================================
+    // AÇÃO: upload-documento
+    // ============================================
+    if (acao === 'upload-documento') {
+      if (!nomeArquivo || !conteudoBase64 || !pastaId) {
+        return res.status(400).json({ 
+          erro: 'Faltam parâmetros: nomeArquivo, conteudoBase64, pastaId',
+          recebido: { nomeArquivo, conteudoBase64Length: conteudoBase64?.length || 0, pastaId }
         });
-        console.log('✓ API respondeu:', response.status);
-    } catch (erro) {
-        console.error('✗ Erro ao conectar API:', erro.message);
+      }
+
+      const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
+      return res.status(200).json({ 
+        sucesso: true, 
+        link: link,
+        mensagem: `Documento "${nomeArquivo}" uploadado com sucesso`
+      });
     }
-}
+
+    // ============================================
+    // AÇÃO: upload (compatibilidade com versões antigas)
+    // ============================================
+    if (acao === 'upload') {
+      if (!nomeArquivo || !conteudoBase64 || !pastaId) {
+        return res.status(400).json({ 
+          erro: 'Faltam parâmetros: nomeArquivo, conteudoBase64, pastaId' 
+        });
+      }
+
+      const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
+      return res.status(200).json({ 
+        sucesso: true, 
+        link: link,
+        mensagem: `Arquivo "${nomeArquivo}" uploadado com sucesso`
+      });
+    }
+
+    // ============================================
+    // AÇÃO DESCONHECIDA
+    // ============================================
+    return res.status(400).json({ 
+      erro: `Ação desconhecida: ${acao}`,
+      acoesDisponíveis: ['criar-pasta', 'criar-subpasta', 'upload-foto', 'upload-documento', 'upload']
+    });
+
+  } catch (error) {
+    console.error('\n❌ ERRO NA API:');
+    console.error('Mensagem:', error.message);
+    console.error('Stack:', error.stack);
+    
+    res.status(500).json({ 
+      erro: 'Erro ao processar requisição',
+      detalhes: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
