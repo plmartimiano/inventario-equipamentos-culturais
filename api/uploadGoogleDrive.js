@@ -143,9 +143,12 @@ module.exports = async (req, res) => {
     // CRIAR SUBPASTA DO EQUIPAMENTO
     // ============================================
     if (acao === 'criar-subpasta') {
-      const pastaRaiz = req.body.pastaRaizMunicipio || SHARED_DRIVE_ID;
-      const nomePasta = `${tipo}_${equipamento}`;
-      const result = await criarPasta(nomePasta, pastaRaiz);
+      const { nomeSubpasta, pastaParentId } = req.body;
+      
+      // Usar pastaParentId se fornecido, senão usar pasta de equipamentos
+      const pastaRaiz = pastaParentId || PASTA_EQUIPAMENTOS_ID;
+      
+      const result = await criarPasta(nomeSubpasta, pastaRaiz);
       return res.status(200).json({
         sucesso: true,
         subpastaId: result.id,
