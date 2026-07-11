@@ -1,163 +1,184 @@
 const { google } = require('googleapis');
+const { Readable } = require('stream');
+const multipart = require('parse-multipart');
 
-function getAuthClient() {
-  try {
-    const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    if (!serviceAccountJson) {
-      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON não configurada');
-    }
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    const auth = new google.auth.GoogleAuth({
-      credentials: serviceAccount,
-      scopes: ['https://www.googleapis.com/auth/drive']
-    });
-    return google.drive({ version: 'v3', auth });
-  } catch (error) {
-    console.error('Erro em getAuthClient:', error.message);
-    throw error;
-  }
+// Configurações
+const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || './service-account.json';
+const SHARED_DRIVE_ID = '0AOfgJt_U5vcPUk9PVA'; // ✅ NOVO ID DO SHARED DRIVE
+
+// Credenciais
+let auth;
+try {
+  const keyFile = require(SERVICE_ACCOUNT_FILE);
+  auth = new google.auth.GoogleAuth({
+    keyFile: SERVICE_ACCOUNT_FILE,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+} catch (e) {
+  console.error('Erro ao carregar credenciais:', e.message);
 }
 
-async function criarPasta(nomePasta, pastaParentId) {
+const drive = google.drive({ version: 'v3', auth });
+
+// ============================================
+// FUNÇÕES
+// ============================================
+
+async function criarPasta(nome, pastaRaizId = SHARED_DRIVE_ID) {
   try {
-    const drive = getAuthClient();
-    const response = await drive.files.create({
-      requestBody: {
-        name: nomePasta,
+    const result = await drive.files.create({
+      resource: {
+        name: nome,
         mimeType: 'application/vnd.google-apps.folder',
-        parents: [pastaParentId]
+        parents: [pastaRaizId],
       },
-      fields: 'id'
+      fields: 'id, name',
+      supportsTeamDrives: true,
     });
-    return response.data.id;
+    return result.data;
   } catch (error) {
-    throw new Error(`Erro ao criar pasta: ${error.message}`);
+    console.error('Erro ao criar pasta:', error.message);
+    throw error;
   }
 }
 
 async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
   try {
-    if (!conteudoBase64 || conteudoBase64.length === 0) {
-      throw new Error('Arquivo vazio');
-    }
-    
-    const { Readable } = require('stream');
+    // Converter Base64 para Buffer
     const buffer = Buffer.from(conteudoBase64, 'base64');
-    const stream = Readable.from(buffer);
     
-    let mimeType = 'application/octet-stream';
-    if (nomeArquivo.endsWith('.jpg') || nomeArquivo.endsWith('.jpeg')) mimeType = 'image/jpeg';
-    else if (nomeArquivo.endsWith('.png')) mimeType = 'image/png';
-    else if (nomeArquivo.endsWith('.gif')) mimeType = 'image/gif';
-    else if (nomeArquivo.endsWith('.pdf')) mimeType = 'application/pdf';
+    // Converter Buffer em Stream
+    const stream = Readable.from(buffer);
 
-    const drive = getAuthClient();
-    const response = await drive.files.create({
-      requestBody: {
+    const result = await drive.files.create({
+      resource: {
         name: nomeArquivo,
-        mimeType: mimeType,
-        parents: [pastaId]
+        parents: [pastaId],
       },
       media: {
-        mimeType: mimeType,
-        body: stream
+        body: stream,
       },
-      fields: 'id, webViewLink'
+      fields: 'id, name, webViewLink',
+      supportsTeamDrives: true,
     });
 
-    return response.data.webViewLink;
+    return result.data;
   } catch (error) {
-    throw new Error(`Erro no upload: ${error.message}`);
+    console.error('Erro ao fazer upload:', error.message);
+    throw error;
   }
 }
 
 async function deletarPasta(pastaId) {
   try {
-    const drive = getAuthClient();
-    
-    const listResponse = await drive.files.list({
-      q: `'${pastaId}' in parents and trashed=false`,
-      spaces: 'drive',
-      fields: 'files(id)',
-      pageSize: 1000
+    await drive.files.delete({
+      fileId: pastaId,
+      supportsTeamDrives: true,
     });
-
-    const files = listResponse.data.files || [];
-    for (const file of files) {
-      await drive.files.delete({ fileId: file.id });
-    }
-    
-    await drive.files.delete({ fileId: pastaId });
+    return { sucesso: true, mensagem: 'Pasta deletada' };
   } catch (error) {
-    throw new Error(`Erro ao deletar: ${error.message}`);
+    console.error('Erro ao deletar pasta:', error.message);
+    throw error;
   }
 }
 
+// ============================================
+// HANDLER VERCEL
+// ============================================
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ erro: 'Método não permitido' });
-  }
-
   try {
-    const { acao, nomePasta, nomeSubpasta, pastaParentId, nomeArquivo, conteudoBase64, pastaId } = req.body;
+    const { acao, municipio, tipo, equipamento, pastaId } = req.body;
 
-    // Criar pasta
+    console.log(`[API] Ação: ${acao}, Município: ${municipio}`);
+
+    // ============================================
+    // CRIAR PASTA DO MUNICÍPIO
+    // ============================================
     if (acao === 'criar-pasta') {
-      if (!nomePasta || !pastaParentId) {
-        return res.status(400).json({ erro: 'Faltam parâmetros' });
-      }
-      const id = await criarPasta(nomePasta, pastaParentId);
-      return res.status(200).json({ sucesso: true, pastaId: id });
+      const pastaRaiz = SHARED_DRIVE_ID;
+      const result = await criarPasta(municipio, pastaRaiz);
+      return res.status(200).json({
+        sucesso: true,
+        pastaId: result.id,
+        nomePasta: result.name,
+        mensagem: 'Pasta do município criada com sucesso',
+      });
     }
 
-    // Criar subpasta
+    // ============================================
+    // CRIAR SUBPASTA DO EQUIPAMENTO
+    // ============================================
     if (acao === 'criar-subpasta') {
-      const nome = nomeSubpasta || nomePasta;
-      if (!nome || !pastaParentId) {
-        return res.status(400).json({ erro: 'Faltam parâmetros' });
-      }
-      const id = await criarPasta(nome, pastaParentId);
-      return res.status(200).json({ sucesso: true, subpastaId: id });
+      const pastaRaiz = req.body.pastaRaizMunicipio || SHARED_DRIVE_ID;
+      const nomePasta = `${tipo}_${equipamento}`;
+      const result = await criarPasta(nomePasta, pastaRaiz);
+      return res.status(200).json({
+        sucesso: true,
+        subpastaId: result.id,
+        nomePasta: result.name,
+        mensagem: 'Subpasta do equipamento criada',
+      });
     }
 
-    // Upload foto
+    // ============================================
+    // UPLOAD DE FOTO
+    // ============================================
     if (acao === 'upload-foto') {
-      if (!nomeArquivo || !conteudoBase64 || !pastaId) {
-        return res.status(400).json({ erro: 'Faltam parâmetros' });
-      }
-      const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
-      return res.status(200).json({ sucesso: true, link: link });
+      const { nomeArquivo, conteudoBase64 } = req.body;
+      const result = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
+      return res.status(200).json({
+        sucesso: true,
+        arquivoId: result.id,
+        nomeArquivo: result.name,
+        link: result.webViewLink,
+        mensagem: 'Foto enviada com sucesso',
+      });
     }
 
-    // Upload documento
+    // ============================================
+    // UPLOAD DE DOCUMENTO
+    // ============================================
     if (acao === 'upload-documento') {
-      if (!nomeArquivo || !conteudoBase64 || !pastaId) {
-        return res.status(400).json({ erro: 'Faltam parâmetros' });
-      }
-      const link = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
-      return res.status(200).json({ sucesso: true, link: link });
+      const { nomeArquivo, conteudoBase64 } = req.body;
+      const result = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
+      return res.status(200).json({
+        sucesso: true,
+        arquivoId: result.id,
+        nomeArquivo: result.name,
+        link: result.webViewLink,
+        mensagem: 'Documento enviado com sucesso',
+      });
     }
 
-    // Deletar pasta
+    // ============================================
+    // DELETAR PASTA
+    // ============================================
     if (acao === 'deletar-pasta') {
-      if (!pastaId) {
-        return res.status(400).json({ erro: 'Faltam parâmetros' });
-      }
-      await deletarPasta(pastaId);
-      return res.status(200).json({ sucesso: true });
+      const result = await deletarPasta(pastaId);
+      return res.status(200).json({
+        sucesso: true,
+        ...result,
+      });
     }
 
-    return res.status(400).json({ erro: 'Ação inválida' });
+    return res.status(400).json({
+      sucesso: false,
+      erro: 'Ação não reconhecida',
+    });
   } catch (error) {
-    console.error('ERRO:', error.message);
-    return res.status(500).json({ sucesso: false, erro: error.message });
+    console.error('[API] Erro:', error);
+    return res.status(500).json({
+      sucesso: false,
+      erro: error.message || 'Erro interno do servidor',
+    });
   }
 };
