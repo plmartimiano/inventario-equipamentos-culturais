@@ -30,7 +30,8 @@ try {
   console.error('❌ Erro ao carregar credenciais:', error.message);
 }
 
-const SHARED_DRIVE_ID = '0AOfgJt_U5vcPUk9PVA'; // ✅ NOVO ID DO SHARED DRIVE
+const SHARED_DRIVE_ID = '0AOfgJt_U5vcPUk9PVA'; // Shared Drive
+const PASTA_EQUIPAMENTOS_ID = '1GRA91-gmzF7gev_9IghyhZckGajnsEzB'; // ✅ Pasta raiz padrão
 const drive = google.drive({ version: 'v3', auth });
 
 // ============================================
@@ -128,7 +129,7 @@ module.exports = async (req, res) => {
     // CRIAR PASTA DO MUNICÍPIO
     // ============================================
     if (acao === 'criar-pasta') {
-      const pastaRaiz = SHARED_DRIVE_ID;
+      const pastaRaiz = PASTA_EQUIPAMENTOS_ID; // ✅ Usar pasta de equipamentos como raiz
       const result = await criarPasta(nomeMunicipio, pastaRaiz);
       return res.status(200).json({
         sucesso: true,
