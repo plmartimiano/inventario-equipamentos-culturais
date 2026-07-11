@@ -117,16 +117,19 @@ module.exports = async (req, res) => {
       });
     }
 
-    const { acao, municipio, tipo, equipamento, pastaId } = req.body;
+    const { acao, municipio, nomePasta, tipo, equipamento, pastaId } = req.body;
+    
+    // Aceitar tanto 'municipio' quanto 'nomePasta'
+    const nomeMunicipio = municipio || nomePasta;
 
-    console.log(`[API] Ação: ${acao}, Município: ${municipio}`);
+    console.log(`[API] Ação: ${acao}, Município: ${nomeMunicipio}`);
 
     // ============================================
     // CRIAR PASTA DO MUNICÍPIO
     // ============================================
     if (acao === 'criar-pasta') {
       const pastaRaiz = SHARED_DRIVE_ID;
-      const result = await criarPasta(municipio, pastaRaiz);
+      const result = await criarPasta(nomeMunicipio, pastaRaiz);
       return res.status(200).json({
         sucesso: true,
         pastaId: result.id,
