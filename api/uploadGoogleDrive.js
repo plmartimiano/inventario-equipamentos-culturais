@@ -1,23 +1,36 @@
 const { google } = require('googleapis');
 const { Readable } = require('stream');
-const multipart = require('parse-multipart');
 
-// Configurações
-const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || './service-account.json';
-const SHARED_DRIVE_ID = '0AOfgJt_U5vcPUk9PVA'; // ✅ NOVO ID DO SHARED DRIVE
+// ============================================
+// CARREGAR CREDENCIAIS DA VARIÁVEL DE AMBIENTE
+// ============================================
 
-// Credenciais
 let auth;
+let serviceAccount;
+
 try {
-  const keyFile = require(SERVICE_ACCOUNT_FILE);
-  auth = new google.auth.GoogleAuth({
-    keyFile: SERVICE_ACCOUNT_FILE,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-} catch (e) {
-  console.error('Erro ao carregar credenciais:', e.message);
+  // Tentar ler da variável de ambiente do Vercel
+  const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  
+  if (credentialsJson) {
+    serviceAccount = JSON.parse(credentialsJson);
+    console.log('✅ Credenciais carregadas da variável de ambiente');
+  } else {
+    console.error('❌ GOOGLE_APPLICATION_CREDENTIALS_JSON não está definida');
+  }
+
+  if (serviceAccount) {
+    auth = new google.auth.GoogleAuth({
+      credentials: serviceAccount,
+      scopes: ['https://www.googleapis.com/auth/drive'],
+    });
+    console.log('✅ Auth configurada com sucesso');
+  }
+} catch (error) {
+  console.error('❌ Erro ao carregar credenciais:', error.message);
 }
 
+const SHARED_DRIVE_ID = '0AOfgJt_U5vcPUk9PVA'; // ✅ NOVO ID DO SHARED DRIVE
 const drive = google.drive({ version: 'v3', auth });
 
 // ============================================
@@ -37,8 +50,8 @@ async function criarPasta(nome, pastaRaizId = SHARED_DRIVE_ID) {
     });
     return result.data;
   } catch (error) {
-    console.error('Erro ao criar pasta:', error.message);
-    throw error;
+    console.error('❌ Erro ao criar pasta:', error.message);
+    throw new Error(`Erro ao criar pasta: ${error.message}`);
   }
 }
 
@@ -64,8 +77,8 @@ async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
 
     return result.data;
   } catch (error) {
-    console.error('Erro ao fazer upload:', error.message);
-    throw error;
+    console.error('❌ Erro ao fazer upload:', error.message);
+    throw new Error(`Erro ao fazer upload: ${error.message}`);
   }
 }
 
@@ -77,8 +90,8 @@ async function deletarPasta(pastaId) {
     });
     return { sucesso: true, mensagem: 'Pasta deletada' };
   } catch (error) {
-    console.error('Erro ao deletar pasta:', error.message);
-    throw error;
+    console.error('❌ Erro ao deletar pasta:', error.message);
+    throw new Error(`Erro ao deletar pasta: ${error.message}`);
   }
 }
 
@@ -96,6 +109,14 @@ module.exports = async (req, res) => {
   }
 
   try {
+    // Verificar se auth está configurada
+    if (!auth) {
+      return res.status(500).json({
+        sucesso: false,
+        erro: 'Credenciais do Google não configuradas. Configure GOOGLE_APPLICATION_CREDENTIALS_JSON no Vercel.',
+      });
+    }
+
     const { acao, municipio, tipo, equipamento, pastaId } = req.body;
 
     console.log(`[API] Ação: ${acao}, Município: ${municipio}`);
@@ -179,6 +200,7 @@ module.exports = async (req, res) => {
     return res.status(500).json({
       sucesso: false,
       erro: error.message || 'Erro interno do servidor',
+      detalhes: error.toString(),
     });
   }
 };
