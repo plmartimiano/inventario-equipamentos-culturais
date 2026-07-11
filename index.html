@@ -4138,9 +4138,11 @@ async function criarPastaMunicipio(nomeMunicipio) {
         console.log('📋 Dados recebidos:', dados);
         
         if (dados.sucesso) {
-            pastasMunicipio[municipioAtual] = dados.pastaId;
+            // ✅ Normalizar chave para minúsculas
+            const chaveMunicipio = municipioAtual.toLowerCase().trim();
+            pastasMunicipio[chaveMunicipio] = dados.pastaId;
             localStorage.setItem('pastasMunicipio', JSON.stringify(pastasMunicipio));
-            console.log(`✅ Pasta criada para ${nomeMunicipio}`);
+            console.log(`✅ Pasta criada para ${nomeMunicipio}`, chaveMunicipio, dados.pastaId);
             showMsg('✅ Pasta criada no Google Drive!');
             return dados.pastaId;
         } else {
@@ -4532,7 +4534,14 @@ async function salvarEquipamentoV3(tipo, obj) {
 function carregarPastasMunicipio() {
     const pastas = localStorage.getItem('pastasMunicipio');
     if (pastas) {
-        pastasMunicipio = JSON.parse(pastas);
+        const pastasCarregadas = JSON.parse(pastas);
+        // ✅ Normalizar todas as chaves para minúsculas
+        pastasMunicipio = {};
+        for (const [chave, pastaId] of Object.entries(pastasCarregadas)) {
+            const chaveNormalizada = chave.toLowerCase().trim();
+            pastasMunicipio[chaveNormalizada] = pastaId;
+        }
+        console.log('✅ Pastas carregadas e normalizadas:', pastasMunicipio);
     }
 }
 
@@ -5396,9 +5405,12 @@ async function deletarMunicipioConfirmado(chave) {
         return;
     }
     
+    // ✅ Normalizar chave para minúsculas
+    const chaveMunicipio = chave.toLowerCase().trim();
+    
     // ✅ NOVO: Deletar a pasta do município do Google Drive
-    if (pastasMunicipio[chave]) {
-        const pastaId = pastasMunicipio[chave];
+    if (pastasMunicipio[chaveMunicipio]) {
+        const pastaId = pastasMunicipio[chaveMunicipio];
         console.log('🗑️ Deletando pasta do município do Google Drive:', pastaId);
         try {
             const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
@@ -5427,7 +5439,7 @@ async function deletarMunicipioConfirmado(chave) {
     
     // Deletar do localStorage
     delete municipios[chave];
-    delete pastasMunicipio[chave];
+    delete pastasMunicipio[chaveMunicipio];
     localStorage.setItem('pastasMunicipio', JSON.stringify(pastasMunicipio));
     saveData();
     municipioAtual = null;
