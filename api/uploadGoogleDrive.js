@@ -85,13 +85,21 @@ async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
 
 async function deletarPasta(pastaId) {
   try {
+    if (!pastaId) {
+      throw new Error('pastaId não fornecido');
+    }
+
+    console.log(`[API] Deletando pasta: ${pastaId}`);
+
     await drive.files.delete({
       fileId: pastaId,
       supportsTeamDrives: true,
     });
-    return { sucesso: true, mensagem: 'Pasta deletada' };
+
+    console.log(`[API] Pasta ${pastaId} deletada com sucesso`);
+    return { sucesso: true, mensagem: 'Pasta deletada com sucesso' };
   } catch (error) {
-    console.error('❌ Erro ao deletar pasta:', error.message);
+    console.error(`[API] Erro ao deletar pasta ${pastaId}:`, error.message);
     throw new Error(`Erro ao deletar pasta: ${error.message}`);
   }
 }
@@ -191,11 +199,26 @@ module.exports = async (req, res) => {
     // DELETAR PASTA
     // ============================================
     if (acao === 'deletar-pasta') {
-      const result = await deletarPasta(pastaId);
-      return res.status(200).json({
-        sucesso: true,
-        ...result,
-      });
+      try {
+        if (!pastaId) {
+          return res.status(400).json({
+            sucesso: false,
+            erro: 'pastaId não fornecido',
+          });
+        }
+
+        const result = await deletarPasta(pastaId);
+        return res.status(200).json({
+          sucesso: true,
+          mensagem: 'Pasta deletada com sucesso',
+          ...result,
+        });
+      } catch (error) {
+        return res.status(500).json({
+          sucesso: false,
+          erro: error.message,
+        });
+      }
     }
 
     return res.status(400).json({
