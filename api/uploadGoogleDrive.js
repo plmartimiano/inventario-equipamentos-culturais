@@ -40,15 +40,23 @@ const drive = google.drive({ version: 'v3', auth });
 
 async function criarPasta(nome, pastaRaizId = SHARED_DRIVE_ID) {
   try {
+    console.log(`[API] Criando pasta: "${nome}" dentro de: "${pastaRaizId}"`);
+    
     const result = await drive.files.create({
       resource: {
         name: nome,
         mimeType: 'application/vnd.google-apps.folder',
         parents: [pastaRaizId],
       },
-      fields: 'id, name',
+      fields: 'id, name, webViewLink',
       supportsTeamDrives: true,
     });
+
+    console.log(`[API] ✅ Pasta criada com sucesso!`);
+    console.log(`[API] ID da pasta: ${result.data.id}`);
+    console.log(`[API] Nome: ${result.data.name}`);
+    console.log(`[API] Link: ${result.data.webViewLink}`);
+
     return result.data;
   } catch (error) {
     console.error('❌ Erro ao criar pasta:', error.message);
@@ -139,10 +147,15 @@ module.exports = async (req, res) => {
     if (acao === 'criar-pasta') {
       const pastaRaiz = PASTA_EQUIPAMENTOS_ID; // ✅ Usar pasta de equipamentos como raiz
       const result = await criarPasta(nomeMunicipio, pastaRaiz);
+      
+      // ✅ GARANTIR que o ID está correto
+      console.log(`[API] Retornando pastaId: ${result.id}`);
+      
       return res.status(200).json({
         sucesso: true,
-        pastaId: result.id,
+        pastaId: result.id, // ✅ CRÍTICO: Usar result.id diretamente
         nomePasta: result.name,
+        webViewLink: result.webViewLink,
         mensagem: 'Pasta do município criada com sucesso',
       });
     }
