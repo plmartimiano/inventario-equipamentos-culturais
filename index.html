@@ -4517,8 +4517,6 @@ async function uploadDocumento(nomeArquivo, conteudoBase64, subpastaId) {
 async function gerarRelatorioPDF(tipo, obj, subpastaId) {
     try {
         console.log('📄 Gerando relatório PDF para:', tipo, obj.nome);
-        
-        // Formatar data e hora
         const agora = new Date();
         const dia = String(agora.getDate()).padStart(2, '0');
         const mes = String(agora.getMonth() + 1).padStart(2, '0');
@@ -4526,225 +4524,88 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
         const horas = String(agora.getHours()).padStart(2, '0');
         const minutos = String(agora.getMinutes()).padStart(2, '0');
         const segundos = String(agora.getSeconds()).padStart(2, '0');
-        
         const dataHora = `${dia}_${mes}_${ano}_${horas}h${minutos}m${segundos}s`;
         const nomePDF = `${tipo}_${obj.nome.replace(/\s+/g, '_')}_${dataHora}.pdf`;
-        
-        // Obter dados do município
         const municipioDados = municipios[municipioAtual] || {};
         
-        // Criar HTML do relatório com formatação melhorada
         let htmlRelatorio = `
 <!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        * { margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { padding: 15px; max-width: 900px; }
-        .header { 
-            text-align: center; 
-            border-bottom: 3px solid #667eea; 
-            margin-bottom: 25px; 
-            padding-bottom: 15px;
-        }
-        .header h1 { font-size: 28px; color: #667eea; margin: 0; }
-        .section { 
-            margin: 25px 0; 
-            padding: 15px; 
-            background: #f8f9ff; 
-            border-left: 4px solid #667eea;
-            page-break-inside: avoid;
-        }
-        .section h2 { 
-            font-size: 18px; 
-            color: #667eea; 
-            margin-bottom: 15px; 
-            border-bottom: 2px solid #e0e0e0;
-            padding-bottom: 8px;
-        }
-        .info-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 12px; 
-            margin: 10px 0;
-        }
-        .info-item { 
-            padding: 8px; 
-            background: white; 
-            border-radius: 3px; 
-            border-left: 3px solid #667eea;
-        }
-        .info-item strong { color: #667eea; display: block; margin-bottom: 3px; }
-        .info-item span { color: #555; }
-        .foto-container {
-            margin: 20px 0;
-            padding: 15px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            page-break-inside: avoid;
-        }
-        .foto-container h3 { 
-            color: #555; 
-            margin-bottom: 10px; 
-            font-size: 14px;
-        }
-        .foto-container img { 
-            max-width: 100%; 
-            height: auto; 
-            max-height: 300px;
-            border-radius: 3px;
-            margin-bottom: 10px;
-        }
-        .foto-link {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 12px;
-            word-break: break-all;
-        }
-        .footer {
-            margin-top: 30px;
-            padding-top: 15px;
-            border-top: 2px solid #ddd;
-            text-align: center;
-            font-size: 11px;
-            color: #999;
-        }
-        .page-break { page-break-after: always; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>📋 Relatório - ${tipo.toUpperCase()}</h1>
-        </div>
-        
-        <div class="section">
-            <h2>📍 Informações do Município</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <strong>Município:</strong>
-                    <span>${municipioDados.nome || municipioAtual || 'N/A'}</span>
-                </div>
-                <div class="info-item">
-                    <strong>Responsável:</strong>
-                    <span>${municipioDados.responsavel || 'N/A'}</span>
-                </div>
-                <div class="info-item">
-                    <strong>Cargo:</strong>
-                    <span>${municipioDados.cargo || 'N/A'}</span>
-                </div>
-                <div class="info-item">
-                    <strong>Email:</strong>
-                    <span>${municipioDados.email || 'N/A'}</span>
-                </div>
-                <div class="info-item">
-                    <strong>Telefone:</strong>
-                    <span>${municipioDados.telefone || 'N/A'}</span>
-                </div>
-                <div class="info-item">
-                    <strong>WhatsApp:</strong>
-                    <span>${municipioDados.whatsapp || 'N/A'}</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="page-break"></div>
-        
-        <div class="section">
-            <h2>📌 Identificação do Equipamento</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <strong>Tipo:</strong>
-                    <span>${tipo.toUpperCase()}</span>
-                </div>
-                <div class="info-item">
-                    <strong>Nome:</strong>
-                    <span>${obj.nome || 'N/A'}</span>
-                </div>
-                <div class="info-item">
-                    <strong>Data/Hora:</strong>
-                    <span>${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}</span>
-                </div>
+<html><head><meta charset="UTF-8"><style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+@page { size: A4; margin: 2cm 1.5cm; }
+body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.3; color: #333; background: white; }
+.container { width: 100%; background: white; }
+header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 8px; }
+header h1 { font-size: 20px; color: #667eea; font-weight: 700; margin: 0; }
+.section-title { background: #667eea; color: white; padding: 8px 12px; border-radius: 3px; margin-bottom: 10px; margin-top: 12px; font-size: 11px; font-weight: 700; page-break-inside: avoid; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; page-break-inside: avoid; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; page-break-inside: avoid; }
+.form-group { page-break-inside: avoid; }
+.form-group label { display: block; font-weight: 700; font-size: 9px; color: #667eea; text-transform: uppercase; margin-bottom: 2px; }
+.form-group input[type="text"], .form-group input[type="number"], .form-group textarea, .form-group select { width: 100%; padding: 6px; border: 1px solid #999; border-radius: 2px; font-size: 10px; background: white; color: #333; }
+.form-group textarea { min-height: 45px; resize: none; }
+.foto-container { margin-bottom: 12px; padding: 8px; border: 1px solid #ddd; border-radius: 2px; background: white; page-break-inside: avoid; }
+.foto-titulo { font-weight: 700; font-size: 10px; color: #667eea; margin-bottom: 6px; }
+.foto-container img { max-width: 100%; height: auto; max-height: 150px; border-radius: 2px; margin-bottom: 4px; }
+.documento-link { font-size: 9px; color: #667eea; text-decoration: none; word-break: break-all; display: block; margin-bottom: 2px; padding: 4px; background: #f0f8ff; border-radius: 2px; border-left: 2px solid #667eea; }
+.fotos-secao { margin-top: 20px; page-break-before: always; }
+.footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid #ddd; text-align: center; font-size: 8px; color: #999; }
+.page-break { page-break-after: always; height: 0; }
+</style></head><body><div class="container"><header><h1>🎭 ${tipo.toUpperCase()}</h1></header>
+<div class="section-title">📍 INFORMAÇÕES DO MUNICÍPIO</div>
+<div class="form-row">
+<div class="form-group"><label>Município</label><input type="text" value="${municipioDados.nome || municipioAtual || ''}" readonly></div>
+<div class="form-group"><label>Responsável</label><input type="text" value="${municipioDados.responsavel || ''}" readonly></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>Cargo</label><input type="text" value="${municipioDados.cargo || ''}" readonly></div>
+<div class="form-group"><label>Email</label><input type="text" value="${municipioDados.email || ''}" readonly></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>Telefone</label><input type="text" value="${municipioDados.telefone || ''}" readonly></div>
+<div class="form-group"><label>WhatsApp</label><input type="text" value="${municipioDados.whatsapp || ''}" readonly></div>
+</div>
+<div class="section-title">📌 IDENTIFICAÇÃO DO ${tipo.toUpperCase()}</div>
+<div class="form-group"><label>Nome do ${tipo}</label><input type="text" value="${obj.nome || ''}" readonly></div>
+<div class="form-group"><label>Endereço Completo</label><textarea readonly>${obj.endereco || ''}</textarea></div>
+<div class="form-row">
+<div class="form-group"><label>Telefone</label><input type="text" value="${obj.telefone || ''}" readonly></div>
+<div class="form-group"><label>Email</label><input type="text" value="${obj.email || ''}" readonly></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>Responsável</label><input type="text" value="${obj.responsavel || ''}" readonly></div>
+<div class="form-group"><label>Capacidade (pessoas)</label><input type="text" value="${obj.capacidade || ''}" readonly></div>
+</div>
+<div class="form-row-3">
+<div class="form-group"><label>Altura Palco (cm)</label><input type="text" value="${obj.altura || ''}" readonly></div>
+<div class="form-group"><label>Profundidade (m)</label><input type="text" value="${obj.profundidade || ''}" readonly></div>
+<div class="form-group"><label>Largura (m)</label><input type="text" value="${obj.largura || ''}" readonly></div>
+</div>
+<div class="form-group"><label>Piso</label><input type="text" value="${obj.piso || ''}" readonly></div>
+<div class="form-group"><label>Observações da Identificação</label><textarea readonly>${obj['id-obs'] || obj.obs || ''}</textarea></div>
+<div class="page-break"></div>
+<div class="fotos-secao">
+${fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0 ? `<div class="section-title">📸 FOTOS (\${fotosTemporarias[tipo].length})</div>\${fotosTemporarias[tipo].map((foto, idx) => `<div class="foto-container"><div class="foto-titulo">📷 Foto \${idx + 1}: \${foto.descricao}</div><img src="data:image/jpeg;base64,\${foto.base64}" /><div style="font-size: 8px; color: #999;">Arquivo: \${foto.nome}</div></div>`).join('')}` : ''}
+${documentosTemporarios[tipo] && documentosTemporarios[tipo].length > 0 ? `<div class="section-title">📄 DOCUMENTOS (\${documentosTemporarios[tipo].length})</div>\${documentosTemporarios[tipo].map((doc, idx) => `<div style="margin-bottom: 8px;"><div class="foto-titulo">📎 Documento \${idx + 1}: \${doc.descricao}</div><a href="https://drive.google.com/file/d/\${doc.driveId}/view" class="documento-link">📥 Baixar: \${doc.nome}</a></div>`).join('')}` : ''}
+</div>
+<div class="footer"><p><strong>${tipo.toUpperCase()}</strong> - ${obj.nome || ''}</p><p>Município: ${municipioDados.nome || municipioAtual || ''}</p><p>Gerado em: ${dia}/${mes}/${ano} às ${horas}:${minutos}:${segundos}</p></div></div></body></html>
         `;
         
-        // Adicionar todos os campos (SEM LIMITE)
-        Object.keys(obj).forEach(chave => {
-            if (['id', 'nome'].includes(chave)) return;
-            if (!obj[chave] || obj[chave] === '' || obj[chave] === 'N/A') return;
-            
-            const nomeFormatado = chave.replace(/_/g, ' ').toUpperCase();
-            const valor = String(obj[chave]); // SEM limite de comprimento
-            
-            htmlRelatorio += `
-                <div class="info-item">
-                    <strong>${nomeFormatado}:</strong>
-                    <span>${valor}</span>
-                </div>
-            `;
-        });
-        
-        htmlRelatorio += `
-            </div>
-        </div>
-        `;
-        
-        // Adicionar fotos com links
-        if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
-            htmlRelatorio += `
-                <div class="section">
-                    <h2>📷 Fotos (${fotosTemporarias[tipo].length})</h2>
-            `;
-            
-            fotosTemporarias[tipo].forEach((foto, index) => {
-                htmlRelatorio += `
-                    <div class="foto-container">
-                        <h3>📸 Foto ${index + 1}: ${foto.descricao}</h3>
-                        <img src="data:image/jpeg;base64,${foto.base64}" />
-                        <p style="font-size: 11px; color: #999; margin: 5px 0;">
-                            Arquivo: ${foto.nome}
-                        </p>
-                    </div>
-                `;
-            });
-            
-            htmlRelatorio += `</div>`;
-        }
-        
-        htmlRelatorio += `
-            <div class="footer">
-                <p>📁 Equipamento: ${tipo.toUpperCase()}</p>
-                <p>🕐 Gerado em: ${dia}/${mes}/${ano} às ${horas}:${minutos}:${segundos}</p>
-                <p>✅ Relatório gerado automaticamente pelo Sistema de Inventário</p>
-            </div>
-        </div>
-    </body>
-</html>
-        `;
-        
-        // Gerar PDF usando html2pdf
         const element = document.createElement('div');
         element.innerHTML = htmlRelatorio;
-        
         const opt = {
-            margin: 5,
+            margin: [20, 15, 20, 15],
             filename: nomePDF,
             image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, logging: false },
+            html2canvas: { scale: 2, logging: false, useCORS: true },
             jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' },
             pagebreak: { mode: 'avoid-all', before: '.page-break' }
         };
         
-        // Gerar PDF
         return new Promise((resolve) => {
             html2pdf().set(opt).from(element).toPdf().get('pdf').then((pdf) => {
-                // Converter PDF para base64
                 const pdfBase64 = pdf.output('dataurlstring').split(',')[1];
                 console.log('✅ PDF gerado com sucesso');
-                
-                // Upload do PDF para Google Drive
                 uploadPDF(nomePDF, pdfBase64, subpastaId).then(resultado => {
                     console.log('📤 PDF enviado para Google Drive:', nomePDF);
                     resolve(resultado);
@@ -4759,8 +4620,6 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
         return { sucesso: false, erro: erro.message };
     }
 }
-
-// Upload do PDF para Google Drive
 async function uploadPDF(nomeArquivo, conteudoBase64, subpastaId) {
     try {
         console.log(`📤 uploadPDF: ${nomeArquivo}`);
@@ -5436,18 +5295,14 @@ function updateLists() {
 }
 
 function editarEspaco(tipo, id) {
-    // Carregar dados do equipamento no formulário
     if (!municipioAtual || !municipios[municipioAtual]) {
         showMsg('⚠️ Nenhum município selecionado!');
         return;
     }
-    
     if (!municipios[municipioAtual].equipamentos[tipo]) {
         showMsg('⚠️ Tipo de equipamento não encontrado');
         return;
     }
-    
-    // Encontrar equipamento - usando comparação correta de ID
     const equipamento = municipios[municipioAtual].equipamentos[tipo].find(e => e.id == id);
     if (!equipamento) {
         console.error('❌ Equipamento não encontrado!', tipo, id);
@@ -5455,12 +5310,8 @@ function editarEspaco(tipo, id) {
         showMsg('⚠️ Equipamento não encontrado');
         return;
     }
-    
-    // Marcar que estamos em modo edição
     equipamentoEmEdicao = { tipo: tipo, id: id };
     console.log('✏️ Editando equipamento:', tipo, id, equipamento);
-    
-    // Limpar formulário antes de carregar
     document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
         if (el.type === 'checkbox' || el.type === 'radio') {
             el.checked = false;
@@ -5469,27 +5320,40 @@ function editarEspaco(tipo, id) {
         }
         el.disabled = false;
     });
-    
-    // Carregar todos os campos no formulário
     Object.keys(equipamento).forEach(chave => {
         if (chave === 'id') return;
         const fieldId = tipo + '-' + chave;
         const field = document.getElementById(fieldId);
         if (field) {
             if (field.type === 'checkbox') {
-                field.checked = equipamento[chave] === true || equipamento[chave] === 'true';
+                field.checked = equipamento[chave] === true || equipamento[chave] === 'true' || equipamento[chave] === 'sim';
             } else {
                 field.value = equipamento[chave] || '';
             }
             field.disabled = false;
+        } else {
+            const fieldSimId = tipo + '-' + chave + '-sim';
+            const fieldNaoId = tipo + '-' + chave + '-nao';
+            const fieldSim = document.getElementById(fieldSimId);
+            const fieldNao = document.getElementById(fieldNaoId);
+            if (fieldSim && fieldNao) {
+                const valor = equipamento[chave];
+                fieldSim.checked = (valor === 'sim' || valor === true);
+                fieldNao.checked = (valor === 'nao' || valor === false);
+                const camposId = tipo + '-' + chave + '-campos';
+                const campos = document.getElementById(camposId);
+                if (campos) {
+                    if (fieldSim.checked || fieldNao.checked) {
+                        campos.classList.remove('campos-desabilitados');
+                        campos.querySelectorAll('input, select').forEach(e => e.disabled = false);
+                    }
+                }
+            }
         }
     });
-    
-    // Ir para aba do formulário
     showTab(tipo);
     showMsg('✓ ' + equipamento.nome + ' carregado para edição');
 }
-
 function deleteEspaco(t, id) {
     // Deletar APENAS do municipioAtual
     if (!municipioAtual || !municipios[municipioAtual]) {
