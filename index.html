@@ -5150,6 +5150,30 @@ function showTab(t) {
 }
 
 function startForm(tipo) {
+    // ✅ CORREÇÃO: Limpar formulário antes de mostrar novo
+    equipamentoEmEdicao = { tipo: null, id: null };
+    
+    // Limpar todos os campos do formulário
+    document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
+        if (el.type === 'checkbox' || el.type === 'radio') {
+            el.checked = false;
+        } else {
+            el.value = '';
+        }
+    });
+    
+    // Limpar listas de fotos e documentos
+    fotosTemporarias[tipo] = [];
+    documentosTemporarios[tipo] = [];
+    atualizarListasFotos(tipo);
+    atualizarListasDocumentos(tipo);
+    
+    // Desabilitar campos relacionados a checkboxes
+    document.querySelectorAll('[id^="' + tipo + '-"][id$="-campos"]').forEach(d => {
+        d.classList.add('campos-desabilitados');
+        d.querySelectorAll('input, select').forEach(e => e.disabled = true);
+    });
+    
     showTab(tipo);
 }
 
