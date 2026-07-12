@@ -2119,6 +2119,33 @@
             </div>
 
             <div class="form-group"><label>Observações Gerais / Recomendações</label><textarea id="casacultura-obs-geral" placeholder="Observações finais do levantamento técnico"></textarea></div>
+
+            <!-- Adicionar Fotos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="casacultura-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="casacultura-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="casacultura-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('casacultura')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="casacultura-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="casacultura-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="casacultura-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('casacultura')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
             <button class="btn btn-success" data-onclick="saveFormCasaCultura()">✓ SALVAR CASA DE CULTURA</button>
         </div>
     </div>
@@ -4080,6 +4107,32 @@
             <div class="form-group"><label>Restrições de Uso do Espaço</label><textarea id="generico-restricoes" placeholder="Ex: não permite som após 22h, uso religioso prioritário, etc."></textarea></div>
             <div class="form-group"><label>Adaptações Necessárias para Uso Cultural</label><textarea id="generico-adaptacoes" placeholder="O que precisaria ser providenciado para receber eventos culturais"></textarea></div>
             <div class="form-group"><label>Observações Gerais e Recomendações</label><textarea id="generico-desc-geral" placeholder="Potencialidades, histórico de uso, contato adicional, etc."></textarea></div>
+
+            <!-- Adicionar Fotos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="generico-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="generico-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="generico-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('generico')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="generico-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="generico-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="generico-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('generico')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
 
             <button class="btn btn-success" data-onclick="saveFormGenerico()">✓ SALVAR ESPAÇO GENÉRICO</button>
         </div>
