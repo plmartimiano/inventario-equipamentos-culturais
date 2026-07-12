@@ -1,282 +1,5655 @@
-const { google } = require('googleapis');
-const { Readable } = require('stream');
-
-// ============================================
-// CARREGAR CREDENCIAIS DA VARIÁVEL DE AMBIENTE
-// ============================================
-
-let auth;
-let serviceAccount;
-
-try {
-  // Tentar ler da variável de ambiente do Vercel
-  const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  
-  if (credentialsJson) {
-    serviceAccount = JSON.parse(credentialsJson);
-    console.log('✅ Credenciais carregadas da variável de ambiente');
-  } else {
-    console.error('❌ GOOGLE_APPLICATION_CREDENTIALS_JSON não está definida');
-  }
-
-  if (serviceAccount) {
-    auth = new google.auth.GoogleAuth({
-      credentials: serviceAccount,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    });
-    console.log('✅ Auth configurada com sucesso');
-  }
-} catch (error) {
-  console.error('❌ Erro ao carregar credenciais:', error.message);
-}
-
-const SHARED_DRIVE_ID = '0AOfgJt_U5vcPUk9PVA'; // Shared Drive
-const PASTA_EQUIPAMENTOS_ID = '1GRA91-gmzF7gev_9IghyhZckGajnsEzB'; // ✅ Pasta raiz padrão
-const drive = google.drive({ version: 'v3', auth });
-
-// ============================================
-// FUNÇÕES
-// ============================================
-
-async function criarPasta(nome, pastaRaizId = SHARED_DRIVE_ID) {
-  try {
-    console.log(`[API] Criando pasta: "${nome}" dentro de: "${pastaRaizId}"`);
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rider Técnico - Completo e Total</title>
     
-    const result = await drive.files.create({
-      resource: {
-        name: nome,
-        mimeType: 'application/vnd.google-apps.folder',
-        parents: [pastaRaizId],
-      },
-      fields: 'id, name, webViewLink',
-      supportsTeamDrives: true,
-    });
+    <!-- Google API Script -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); padding: 10px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; }
+        h1 { color: #333; font-size: 24px; margin-bottom: 5px; }
+        .subtitle { color: #666; font-size: 13px; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 15px; background: white; padding: 10px; border-radius: 10px; flex-wrap: wrap; }
+        .tab-btn { flex: 0 0 auto; padding: 10px 15px; border: 2px solid #ddd; background: white; color: #333; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px; }
+        .tab-btn.active { background: #667eea; color: white; border-color: #667eea; }
+        
+        /* Ocultar abas de equipamentos por padrão */
+        #tab-menu-btn,
+        #tab-teatro-btn,
+        #tab-auditorio-btn,
+        #tab-casacultura-btn,
+        #tab-praca-btn,
+        #tab-biblioteca-btn,
+        #tab-ginasio-btn,
+        #tab-generico-btn {
+            display: none !important;
+        }
+        .content { display: none; max-height: 90vh; overflow-y: auto; }
+        .content.active { display: block; }
+        .equipamento-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border-left: 4px solid #667eea; }
+        .equipamento-card h3 { color: #667eea; margin-bottom: 8px; font-size: 16px; }
+        .badge { display: inline-block; background: #667eea; color: white; padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+        .btn { padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; width: 100%; margin-bottom: 8px; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #11998e; color: white; }
+        .btn-danger { background: #ff6b6b; color: white; font-size: 12px; padding: 6px; }
+        .msg { background: #d4edda; color: #155724; padding: 10px; border-radius: 6px; margin-bottom: 12px; text-align: center; font-weight: 600; }
+        .lista { background: #f5f5f5; padding: 8px; border-radius: 6px; max-height: 120px; overflow-y: auto; margin-bottom: 10px; font-size: 12px; }
+        .item { display: flex; justify-content: space-between; padding: 6px; background: white; margin-bottom: 4px; border-radius: 4px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-weight: 700; font-size: 12px; margin-bottom: 5px; color: #333; }
+        input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+        textarea { min-height: 60px; }
+        .rider-section { background: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #667eea; }
+        .rider-section h4 { color: #667eea; font-size: 13px; margin-bottom: 10px; font-weight: 700; }
+        .rider-row { display: grid; grid-template-columns: 1fr 0.7fr 1fr; gap: 8px; margin-bottom: 8px; }
+        .rider-input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
+        .rider-input:disabled { background: #f0f0f0; color: #999; cursor: not-allowed; opacity: 0.6; }
+        .section-title { background: #667eea; color: white; padding: 10px; border-radius: 6px; margin-bottom: 10px; margin-top: 16px; font-size: 13px; font-weight: 700; }
+        .rider-label { font-size: 11px; color: #666; margin-bottom: 3px; font-weight: 600; }
+        .checkbox-box-top { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; background: #fff3cd; border-radius: 6px; border: 2px solid #ffc107; margin-bottom: 12px; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .checkbox-item input[type="checkbox"] { width: 20px; height: 20px; margin: 0; cursor: pointer; }
+        .checkbox-item label { margin: 0; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .campos-desabilitados { opacity: 0.5; pointer-events: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🎭 Inventário de Equipamentos Culturais</h1>
+        <p class="subtitle">Mapeamento de Espaços Culturais</p>
+        <!-- Indicador de Município Atual -->
+        <div id="municipio-indicador" style="background: #f0f8ff; padding: 8px 12px; border-radius: 6px; margin-top: 10px; text-align: center; font-weight: 600; color: #667eea; font-size: 14px; display: none;">
+            📍 Município: <span id="municipio-nome-indicador"></span>
+        </div>
+    </header>
 
-    console.log(`[API] ✅ Pasta criada com sucesso!`);
-    console.log(`[API] ID da pasta: ${result.data.id}`);
-    console.log(`[API] Nome: ${result.data.name}`);
-    console.log(`[API] Link: ${result.data.webViewLink}`);
+    <div class="tabs">
+        <button class="tab-btn active" data-onclick="showTab('municipio')">🏛️ Início</button>
+        <button class="tab-btn" id="tab-menu-btn" data-onclick="showTab('menu')" style="display:none;">📍 Menu</button>
+        <button class="tab-btn" id="tab-teatro-btn" data-onclick="showTab('teatro')" style="display:none;">🎭 Teatro</button>
+        <button class="tab-btn" id="tab-auditorio-btn" data-onclick="showTab('auditorio')" style="display:none;">🎤 Auditório</button>
+        <button class="tab-btn" id="tab-casacultura-btn" data-onclick="showTab('casacultura')" style="display:none;">🏛️ Casa Cultura</button>
+        <button class="tab-btn" id="tab-praca-btn" data-onclick="showTab('praca')" style="display:none;">🏞️ Praça</button>
+        <button class="tab-btn" id="tab-biblioteca-btn" data-onclick="showTab('biblioteca')" style="display:none;">📚 Bib</button>
+        <button class="tab-btn" id="tab-ginasio-btn" data-onclick="showTab('ginasio')" style="display:none;">🏀 Ginásio</button>
+        <button class="tab-btn" id="tab-generico-btn" data-onclick="showTab('generico')" style="display:none;">🏢 Genérico</button>
+    </div>
 
-    return result.data;
-  } catch (error) {
-    console.error('❌ Erro ao criar pasta:', error.message);
-    throw new Error(`Erro ao criar pasta: ${error.message}`);
-  }
-}
+    <div id="msg"></div>
 
-async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
-  try {
-    // Converter Base64 para Buffer
-    const buffer = Buffer.from(conteudoBase64, 'base64');
-    
-    // Converter Buffer em Stream
-    const stream = Readable.from(buffer);
+    <!-- IDENTIFICAÇÃO DO MUNICÍPIO -->
+    <div id="municipio" class="content active">
+        <div class="equipamento-card">
+            <h3>🏛️ SELEÇÃO / CADASTRO DE MUNICÍPIO</h3>
+            
+            <!-- DROPDOWN DE SELEÇÃO -->
+            <div class="section-title">📋 Selecionar Município Existente</div>
+            <div class="form-group">
+                <label>Município Cadastrado</label>
+                <select id="municipio-select" data-onchange="carregarMunicipio()">
+                    <option value="">Selecione um município...</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="btn btn-info" data-onclick="atualizarDropdownMunicipios()">🔄 Atualizar Lista</button>
+                <button class="btn btn-danger" data-onclick="deletarMunicipio()">🗑️ Deletar Município Selecionado</button>
+                <button class="btn btn-primary" data-onclick="limparFormularioMunicipio()">➕ Novo Município</button>
+            </div>
+            
+            <!-- DADOS DO MUNICÍPIO SELECIONADO -->
+            <div id="resumo-municipio" style="display:none; background: #f0f8ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div class="section-title">📊 Dados do Município Selecionado</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px;">
+                    <div><b>Nome:</b> <span id="resumo-nome"></span></div>
+                    <div><b>Responsável:</b> <span id="resumo-responsavel"></span></div>
+                    <div><b>Cargo:</b> <span id="resumo-cargo"></span></div>
+                    <div><b>Email:</b> <span id="resumo-email"></span></div>
+                    <div><b>Telefone:</b> <span id="resumo-telefone"></span></div>
+                    <div><b>WhatsApp:</b> <span id="resumo-whatsapp"></span></div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <button class="btn btn-primary" data-onclick="showTab('menu')">👁️ VER EQUIPAMENTOS</button>
+                    <button class="btn btn-secondary" data-onclick="exportJSON()">📥 EXPORTAR JSON</button>
+                </div>
+            </div>
+            
+            <!-- FORMULÁRIO DE NOVO MUNICÍPIO -->
+            <div id="formulario-novo-municipio" style="display: none;">
+                <div class="section-title">➕ Preenchimento de Novo Município</div>
+                
+                <div class="form-group"><label>Município</label><input type="text" id="municipio-nome" placeholder="Nome do município"></div>
+                <div class="form-group"><label>Nome (Responsável)</label><input type="text" id="municipio-responsavel" placeholder="Nome completo"></div>
+                <div class="form-group"><label>Cargo</label><input type="text" id="municipio-cargo" placeholder="Cargo/Função"></div>
+                <div class="form-group"><label>Endereço</label><textarea id="municipio-endereco" placeholder="Endereço completo da prefeitura/secretaria"></textarea></div>
+                <div class="form-group"><label>Telefone</label><input type="text" id="municipio-telefone" placeholder="(00) 0000-0000"></div>
+                <div class="form-group"><label>E-mail</label><input type="text" id="municipio-email" placeholder="email@example.com"></div>
+                <div class="form-group"><label>WhatsApp</label><input type="text" id="municipio-whatsapp" placeholder="(00) 00000-0000"></div>
+                <div class="form-group"><label>Data da Atualização</label><input type="date" id="municipio-data"></div>
+                <div class="form-group"><label>Observações</label><textarea id="municipio-obs" placeholder="Observações gerais sobre o município"></textarea></div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-success" data-onclick="saveMunicipio()">✓ SALVAR NOVO MUNICÍPIO</button>
+                    <button class="btn btn-secondary" data-onclick="ocultarFormularioMunicipio()">✕ Cancelar</button>
+                </div>
+                <div id="municipio-msg"></div>
+            </div>
+        </div>
+    </div>
 
-    const result = await drive.files.create({
-      resource: {
-        name: nomeArquivo,
-        parents: [pastaId],
-      },
-      media: {
-        body: stream,
-      },
-      fields: 'id, name, webViewLink',
-      supportsTeamDrives: true,
-    });
+    <!-- MENU -->
+    <div id="menu" class="content">
+        <button class="btn btn-success" data-onclick="exportJSON()">📥 Exportar JSON</button>
+        <button class="btn btn-danger" data-onclick="limparDados()" style="margin-left: 10px;">🗑️ Limpar Dados Locais</button>
+        <div class="equipamento-card">
+            <h3>🎭 Teatro</h3>
+            <div class="badge" id="teatro-count">0</div>
+            <div class="lista" id="teatro-lista"></div>
+            <button class="btn btn-primary" data-onclick="startForm('teatro')">➕ Adicionar</button>
+        </div>
+        <div class="equipamento-card">
+            <h3>🎤 Auditório</h3>
+            <div class="badge" id="auditorio-count">0</div>
+            <div class="lista" id="auditorio-lista"></div>
+            <button class="btn btn-primary" data-onclick="startForm('auditorio')">➕ Adicionar</button>
+        </div>
+        <div class="equipamento-card">
+            <h3>🏛️ Casa de Cultura</h3>
+            <div class="badge" id="casacultura-count">0</div>
+            <div class="lista" id="casacultura-lista"></div>
+            <button class="btn btn-primary" data-onclick="startForm('casacultura')">➕ Adicionar</button>
+        </div>
+        <div class="equipamento-card">
+            <h3>🏞️ Praça</h3>
+            <div class="badge" id="praca-count">0</div>
+            <div class="lista" id="praca-lista"></div>
+            <button class="btn btn-primary" data-onclick="startForm('praca')">➕ Adicionar</button>
+        </div>
+        <div class="equipamento-card">
+            <h3>📚 Biblioteca</h3>
+            <div class="badge" id="biblioteca-count">0</div>
+            <div class="lista" id="biblioteca-lista"></div>
+            <button class="btn btn-primary" data-onclick="startForm('biblioteca')">➕ Adicionar</button>
+        </div>
+        <div class="equipamento-card">
+            <h3>🏀 Ginásio</h3>
+            <div class="badge" id="ginasio-count">0</div>
+            <div class="lista" id="ginasio-lista"></div>
+            <button class="btn btn-primary" data-onclick="startForm('ginasio')">➕ Adicionar</button>
+        </div>
+        <div class="equipamento-card">
+            <h3>🏢 Espaço Genérico / Multiuso</h3>
+            <div class="badge" id="generico-count">0</div>
+            <div class="lista" id="generico-lista"></div>
+            <button class="btn btn-primary" data-onclick="startForm('generico')">➕ Adicionar</button>
+        </div>
+    </div>
 
-    return result.data;
-  } catch (error) {
-    console.error('❌ Erro ao fazer upload:', error.message);
-    throw new Error(`Erro ao fazer upload: ${error.message}`);
-  }
-}
+    <!-- TEATRO COMPLETO COM TODAS AS SEÇÕES -->
+    <div id="teatro" class="content">
+        <button class="btn" style="background: #999; color: white; margin-bottom: 15px;" data-onclick="showTab('menu')">← Voltar</button>
+        <div class="equipamento-card">
+            <h3>🎭 INVENTÁRIO - TEATRO</h3>
+            
+            <div class="section-title">📌 IDENTIFICAÇÃO DO TEATRO</div>
+            <div class="form-group"><label>Nome do Teatro</label><input type="text" id="teatro-nome" placeholder="Nome"></div>
+            <div class="form-group"><label>Endereço Completo</label><textarea id="teatro-endereco" placeholder="Endereço"></textarea></div>
+            <div class="form-group"><label>Telefone</label><input type="text" id="teatro-telefone" placeholder="(00) 0000-0000"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="teatro-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Responsável</label><input type="text" id="teatro-responsavel"></div>
+            <div class="form-group"><label>Capacidade (pessoas)</label><input type="number" id="teatro-capacidade"></div>
+            <div class="form-group"><label>Altura Palco (cm)</label><input type="number" id="teatro-altura"></div>
+            <div class="form-group"><label>Profundidade (m)</label><input type="number" id="teatro-profundidade"></div>
+            <div class="form-group"><label>Largura (m)</label><input type="number" id="teatro-largura"></div>
+            <div class="form-group"><label>Piso</label><input type="text" id="teatro-piso" placeholder="Ex: Madeira"></div>
+            <div class="form-group"><label>Observações da Identificação</label><textarea id="teatro-id-obs" placeholder="Informações adicionais"></textarea></div>
 
-async function deletarPasta(pastaId) {
-  try {
-    if (!pastaId) {
-      throw new Error('pastaId não fornecido');
-    }
+            <!-- FOTOS -->
+            <div class="section-title">📸 FOTOS E DOCUMENTOS</div>
+            
+            <!-- Adicionar Fotos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="teatro-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="teatro-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="teatro-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('teatro')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
 
-    console.log(`[API] Deletando pasta: ${pastaId}`);
+            <!-- Adicionar Documentos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="teatro-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="teatro-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="teatro-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('teatro')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
 
-    // ✅ NOVO: Verificar se a pasta existe primeiro
+            <!-- INFRAESTRUTURA - NOVO -->
+            <div class="section-title">🏢 INFRAESTRUTURA - NOVO</div>
+
+            <div class="rider-section">
+                <h4>Possui Foyer?</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-foyer-sim" data-onchange="toggleCampos('teatro-foyer')"><label for="teatro-foyer-sim">( ) Sim</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-foyer-nao" data-onchange="toggleCampos('teatro-foyer')"><label for="teatro-foyer-nao">( ) Não</label></div>
+                </div>
+                <div id="teatro-foyer-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Capacidade</div><input type="number" class="rider-input" id="teatro-foyer-cap" disabled></div>
+                        <div><div class="rider-label">Área (m²)</div><input type="number" class="rider-input" id="teatro-foyer-area" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-foyer-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Praticáveis Telescópicos?</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-praticavel-sim" data-onchange="toggleCampos('teatro-praticavel')"><label for="teatro-praticavel-sim">( ) Sim</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-praticavel-nao" data-onchange="toggleCampos('teatro-praticavel')"><label for="teatro-praticavel-nao">( ) Não</label></div>
+                </div>
+                <div id="teatro-praticavel-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="teatro-praticavel-qtd" disabled></div>
+                        <div><div class="rider-label">Dimensões</div><input type="text" class="rider-input" id="teatro-praticavel-dim" placeholder="L x C x A" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-praticavel-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Mesas para Mesa-Redonda?</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mesa-redonda-sim" data-onchange="toggleCampos('teatro-mesa-redonda')"><label for="teatro-mesa-redonda-sim">( ) Sim</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mesa-redonda-nao" data-onchange="toggleCampos('teatro-mesa-redonda')"><label for="teatro-mesa-redonda-nao">( ) Não</label></div>
+                </div>
+                <div id="teatro-mesa-redonda-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="teatro-mesa-redonda-qtd" disabled></div>
+                        <div><div class="rider-label">Tamanho</div><input type="text" class="rider-input" id="teatro-mesa-redonda-tam" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="teatro-mesa-redonda-mat" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Mesas e Cadeiras para Coffee Break?</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-coffee-sim" data-onchange="toggleCampos('teatro-coffee')"><label for="teatro-coffee-sim">( ) Sim</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-coffee-nao" data-onchange="toggleCampos('teatro-coffee')"><label for="teatro-coffee-nao">( ) Não</label></div>
+                </div>
+                <div id="teatro-coffee-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Mesas (Qtd)</div><input type="number" class="rider-input" id="teatro-coffee-mesas" disabled></div>
+                        <div><div class="rider-label">Cadeiras (Qtd)</div><input type="number" class="rider-input" id="teatro-coffee-cadeiras" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-coffee-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1. ILUMINAÇÃO CÊNICA -->
+            <div class="section-title">1️⃣ ILUMINAÇÃO CÊNICA (10 ITENS)</div>
+            
+            <div class="rider-section">
+                <h4>Mesa de Luz</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mesa-luz-sim" data-onchange="toggleCampos('teatro-mesa-luz')"><label for="teatro-mesa-luz-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mesa-luz-nao" data-onchange="toggleCampos('teatro-mesa-luz')"><label for="teatro-mesa-luz-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-mesa-luz-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-mesa-luz-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-mesa-luz-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-mesa-luz-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Dimmers</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-dimmers-sim" data-onchange="toggleCampos('teatro-dimmers')"><label for="teatro-dimmers-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-dimmers-nao" data-onchange="toggleCampos('teatro-dimmers')"><label for="teatro-dimmers-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-dimmers-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-dimmers-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-dimmers-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-dimmers-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Refletor PC (Plano-Convexo)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pc-sim" data-onchange="toggleCampos('teatro-pc')"><label for="teatro-pc-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pc-nao" data-onchange="toggleCampos('teatro-pc')"><label for="teatro-pc-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-pc-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-pc-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-pc-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-pc-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Refletor Fresnel</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-fresnel-sim" data-onchange="toggleCampos('teatro-fresnel')"><label for="teatro-fresnel-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-fresnel-nao" data-onchange="toggleCampos('teatro-fresnel')"><label for="teatro-fresnel-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-fresnel-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-fresnel-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-fresnel-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-fresnel-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Refletor Elipsoidal</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-elipsoidal-sim" data-onchange="toggleCampos('teatro-elipsoidal')"><label for="teatro-elipsoidal-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-elipsoidal-nao" data-onchange="toggleCampos('teatro-elipsoidal')"><label for="teatro-elipsoidal-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-elipsoidal-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-elipsoidal-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-elipsoidal-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-elipsoidal-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Refletor PAR 64</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-par64-sim" data-onchange="toggleCampos('teatro-par64')"><label for="teatro-par64-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-par64-nao" data-onchange="toggleCampos('teatro-par64')"><label for="teatro-par64-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-par64-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-par64-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-par64-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-par64-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Refletor PAR LED</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-par-led-sim" data-onchange="toggleCampos('teatro-par-led')"><label for="teatro-par-led-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-par-led-nao" data-onchange="toggleCampos('teatro-par-led')"><label for="teatro-par-led-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-par-led-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-par-led-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-par-led-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-par-led-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Moving Light</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-moving-sim" data-onchange="toggleCampos('teatro-moving')"><label for="teatro-moving-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-moving-nao" data-onchange="toggleCampos('teatro-moving')"><label for="teatro-moving-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-moving-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-moving-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-moving-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-moving-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Ribalta LED</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-ribalta-sim" data-onchange="toggleCampos('teatro-ribalta')"><label for="teatro-ribalta-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-ribalta-nao" data-onchange="toggleCampos('teatro-ribalta')"><label for="teatro-ribalta-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-ribalta-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-ribalta-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-ribalta-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-ribalta-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Cabos DMX</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-cabos-dmx-sim" data-onchange="toggleCampos('teatro-cabos-dmx')"><label for="teatro-cabos-dmx-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-cabos-dmx-nao" data-onchange="toggleCampos('teatro-cabos-dmx')"><label for="teatro-cabos-dmx-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-cabos-dmx-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tamanho</div><input type="text" class="rider-input" id="teatro-cabos-dmx-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-cabos-dmx-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-cabos-dmx-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. SONOPLASTIA -->
+            <div class="section-title">2️⃣ SONOPLASTIA (10 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Mesa de Som</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mesa-som-sim" data-onchange="toggleCampos('teatro-mesa-som')"><label for="teatro-mesa-som-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mesa-som-nao" data-onchange="toggleCampos('teatro-mesa-som')"><label for="teatro-mesa-som-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-mesa-som-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-mesa-som-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-mesa-som-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-mesa-som-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>P.A. (Caixas Altas)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pa-sim" data-onchange="toggleCampos('teatro-pa')"><label for="teatro-pa-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pa-nao" data-onchange="toggleCampos('teatro-pa')"><label for="teatro-pa-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-pa-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-pa-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-pa-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-pa-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>P.A. (Subwoofers)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-sub-sim" data-onchange="toggleCampos('teatro-sub')"><label for="teatro-sub-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-sub-nao" data-onchange="toggleCampos('teatro-sub')"><label for="teatro-sub-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-sub-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-sub-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-sub-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-sub-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Retorno de Palco</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-retorno-sim" data-onchange="toggleCampos('teatro-retorno')"><label for="teatro-retorno-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-retorno-nao" data-onchange="toggleCampos('teatro-retorno')"><label for="teatro-retorno-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-retorno-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-retorno-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-retorno-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-retorno-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Microfones Sem Fio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mic-sf-sim" data-onchange="toggleCampos('teatro-mic-sf')"><label for="teatro-mic-sf-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mic-sf-nao" data-onchange="toggleCampos('teatro-mic-sf')"><label for="teatro-mic-sf-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-mic-sf-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-mic-sf-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-mic-sf-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-mic-sf-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Microfones Com Fio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mic-cf-sim" data-onchange="toggleCampos('teatro-mic-cf')"><label for="teatro-mic-cf-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mic-cf-nao" data-onchange="toggleCampos('teatro-mic-cf')"><label for="teatro-mic-cf-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-mic-cf-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-mic-cf-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-mic-cf-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-mic-cf-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Microfone Shotgun</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mic-shotgun-sim" data-onchange="toggleCampos('teatro-mic-shotgun')"><label for="teatro-mic-shotgun-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-mic-shotgun-nao" data-onchange="toggleCampos('teatro-mic-shotgun')"><label for="teatro-mic-shotgun-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-mic-shotgun-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-mic-shotgun-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-mic-shotgun-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-mic-shotgun-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Direct Box (DI)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-di-sim" data-onchange="toggleCampos('teatro-di')"><label for="teatro-di-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-di-nao" data-onchange="toggleCampos('teatro-di')"><label for="teatro-di-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-di-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-di-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-di-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-di-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Pedestais</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pedestais-sim" data-onchange="toggleCampos('teatro-pedestais')"><label for="teatro-pedestais-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pedestais-nao" data-onchange="toggleCampos('teatro-pedestais')"><label for="teatro-pedestais-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-pedestais-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-pedestais-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-pedestais-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-pedestais-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Cabos XLR</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-cabos-xlr-sim" data-onchange="toggleCampos('teatro-cabos-xlr')"><label for="teatro-cabos-xlr-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-cabos-xlr-nao" data-onchange="toggleCampos('teatro-cabos-xlr')"><label for="teatro-cabos-xlr-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-cabos-xlr-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tamanho</div><input type="text" class="rider-input" id="teatro-cabos-xlr-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-cabos-xlr-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="teatro-cabos-xlr-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. VESTIMENTA CÊNICA E MAQUINARIA -->
+            <div class="section-title">3️⃣ VESTIMENTA CÊNICA (7 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Cortina de Boca</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-cortina-boca-sim" data-onchange="toggleCampos('teatro-cortina-boca')"><label for="teatro-cortina-boca-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-cortina-boca-nao" data-onchange="toggleCampos('teatro-cortina-boca')"><label for="teatro-cortina-boca-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-cortina-boca-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-cortina-boca-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-cortina-boca-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-cortina-boca-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Rotunda</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-rotunda-sim" data-onchange="toggleCampos('teatro-rotunda')"><label for="teatro-rotunda-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-rotunda-nao" data-onchange="toggleCampos('teatro-rotunda')"><label for="teatro-rotunda-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-rotunda-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-rotunda-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-rotunda-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-rotunda-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Ciclorama</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-ciclorama-sim" data-onchange="toggleCampos('teatro-ciclorama')"><label for="teatro-ciclorama-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-ciclorama-nao" data-onchange="toggleCampos('teatro-ciclorama')"><label for="teatro-ciclorama-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-ciclorama-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-ciclorama-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-ciclorama-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-ciclorama-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Pernas</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pernas-sim" data-onchange="toggleCampos('teatro-pernas')"><label for="teatro-pernas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pernas-nao" data-onchange="toggleCampos('teatro-pernas')"><label for="teatro-pernas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-pernas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-pernas-desc" disabled></div>
+                        <div><div class="rider-label">Pares</div><input type="number" class="rider-input" id="teatro-pernas-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-pernas-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Bambolinas</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-bambolinas-sim" data-onchange="toggleCampos('teatro-bambolinas')"><label for="teatro-bambolinas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-bambolinas-nao" data-onchange="toggleCampos('teatro-bambolinas')"><label for="teatro-bambolinas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-bambolinas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-bambolinas-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-bambolinas-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-bambolinas-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Varas de Luz</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-varas-luz-sim" data-onchange="toggleCampos('teatro-varas-luz')"><label for="teatro-varas-luz-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-varas-luz-nao" data-onchange="toggleCampos('teatro-varas-luz')"><label for="teatro-varas-luz-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-varas-luz-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-varas-luz-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-varas-luz-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-varas-luz-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Varas de Cenário</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-varas-cenario-sim" data-onchange="toggleCampos('teatro-varas-cenario')"><label for="teatro-varas-cenario-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-varas-cenario-nao" data-onchange="toggleCampos('teatro-varas-cenario')"><label for="teatro-varas-cenario-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-varas-cenario-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-varas-cenario-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-varas-cenario-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-varas-cenario-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. VÍDEO E PROJEÇÃO + NOVOS -->
+            <div class="section-title">4️⃣ VÍDEO E PROJEÇÃO</div>
+
+            <div class="rider-section">
+                <h4>Projetor</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-projetor-sim" data-onchange="toggleCampos('teatro-projetor')"><label for="teatro-projetor-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-projetor-nao" data-onchange="toggleCampos('teatro-projetor')"><label for="teatro-projetor-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-projetor-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-projetor-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-projetor-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="teatro-projetor-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Tela de Projeção</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-tela-sim" data-onchange="toggleCampos('teatro-tela')"><label for="teatro-tela-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-tela-nao" data-onchange="toggleCampos('teatro-tela')"><label for="teatro-tela-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-tela-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-tela-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-tela-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-tela-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Cabos de Vídeo</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-cabos-video-sim" data-onchange="toggleCampos('teatro-cabos-video')"><label for="teatro-cabos-video-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-cabos-video-nao" data-onchange="toggleCampos('teatro-cabos-video')"><label for="teatro-cabos-video-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-cabos-video-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="teatro-cabos-video-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-cabos-video-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="teatro-cabos-video-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Passador de Slides - NOVO</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-passador-sim" data-onchange="toggleCampos('teatro-passador')"><label for="teatro-passador-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-passador-nao" data-onchange="toggleCampos('teatro-passador')"><label for="teatro-passador-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-passador-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="teatro-passador-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="teatro-passador-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="teatro-passador-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Computador Disponível - NOVO</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pc-disp-sim" data-onchange="toggleCampos('teatro-pc-disp')"><label for="teatro-pc-disp-sim">( ) Sim</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pc-disp-nao" data-onchange="toggleCampos('teatro-pc-disp')"><label for="teatro-pc-disp-nao">( ) Não</label></div>
+                </div>
+                <div id="teatro-pc-disp-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Processador</div><input type="text" class="rider-input" id="teatro-pc-disp-proc" disabled></div>
+                        <div><div class="rider-label">RAM</div><input type="text" class="rider-input" id="teatro-pc-disp-ram" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="teatro-pc-disp-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACESSIBILIDADE - NOVA -->
+            <div class="section-title">♿ ACESSIBILIDADE - NOVO</div>
+
+            <div class="rider-section">
+                <h4>Acesso ao Palco</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-acesso-palco-sim" data-onchange="toggleCampos('teatro-acesso-palco')"><label for="teatro-acesso-palco-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-acesso-palco-nao" data-onchange="toggleCampos('teatro-acesso-palco')"><label for="teatro-acesso-palco-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-acesso-palco-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><select class="rider-input" id="teatro-acesso-palco-tipo" disabled><option>Rampa</option><option>Elevador</option><option>Plataforma</option></select></div>
+                        <div><div class="rider-label">Altura/Inclinação</div><input type="text" class="rider-input" id="teatro-acesso-palco-alt" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="teatro-acesso-palco-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Rotas Acessíveis</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-rotas-sim" data-onchange="toggleCampos('teatro-rotas')"><label for="teatro-rotas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-rotas-nao" data-onchange="toggleCampos('teatro-rotas')"><label for="teatro-rotas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-rotas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Rampas?</div><select class="rider-input" id="teatro-rotas-rampas" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Elevadores?</div><select class="rider-input" id="teatro-rotas-elevadores" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Onde?</div><input type="text" class="rider-input" id="teatro-rotas-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Assentos PNE</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pne-sim" data-onchange="toggleCampos('teatro-pne')"><label for="teatro-pne-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-pne-nao" data-onchange="toggleCampos('teatro-pne')"><label for="teatro-pne-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-pne-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Cadeirantes</div><input type="number" class="rider-input" id="teatro-pne-cadeira" disabled></div>
+                        <div><div class="rider-label">Obesos</div><input type="number" class="rider-input" id="teatro-pne-obeso" disabled></div>
+                        <div><div class="rider-label">Sinalizado?</div><select class="rider-input" id="teatro-pne-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sanitários Adaptados</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-sanitario-sim" data-onchange="toggleCampos('teatro-sanitario')"><label for="teatro-sanitario-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-sanitario-nao" data-onchange="toggleCampos('teatro-sanitario')"><label for="teatro-sanitario-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-sanitario-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Masculino?</div><select class="rider-input" id="teatro-sanitario-masc" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Feminino?</div><select class="rider-input" id="teatro-sanitario-fem" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Unissex?</div><select class="rider-input" id="teatro-sanitario-uni" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group"><label>Observações Gerais</label><textarea id="teatro-obs"></textarea></div>
+            
+            <!-- SEGURANÇA E DOCUMENTAÇÃO LEGAL - NOVO -->
+            <div class="section-title">🔒 SEGURANÇA E DOCUMENTAÇÃO LEGAL</div>
+
+            <div class="rider-section">
+                <h4>AVCB (Alvará de Corpo de Bombeiros)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-seg-avcb-sim" data-onchange="toggleCampos('teatro-seg-avcb')"><label for="teatro-seg-avcb-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-seg-avcb-nao" data-onchange="toggleCampos('teatro-seg-avcb')"><label for="teatro-seg-avcb-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-seg-avcb-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Válido?</div><select class="rider-input" id="teatro-seg-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="teatro-seg-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="teatro-seg-avcb-numero" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="teatro-seg-avcb-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Extintores de Incêndio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-seg-extintores-sim" data-onchange="toggleCampos('teatro-seg-extintores')"><label for="teatro-seg-extintores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-seg-extintores-nao" data-onchange="toggleCampos('teatro-seg-extintores')"><label for="teatro-seg-extintores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-seg-extintores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="teatro-seg-extintores-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo (ABC/CO2)</div><input type="text" class="rider-input" id="teatro-seg-extintores-tipo" disabled></div>
+                        <div><div class="rider-label">Vencido?</div><select class="rider-input" id="teatro-seg-extintores-vencido" disabled><option>Não</option><option>Sim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="teatro-seg-extintores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Rotas de Fuga e Sinalização</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-seg-rotas-fuga-sim" data-onchange="toggleCampos('teatro-seg-rotas-fuga')"><label for="teatro-seg-rotas-fuga-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-seg-rotas-fuga-nao" data-onchange="toggleCampos('teatro-seg-rotas-fuga')"><label for="teatro-seg-rotas-fuga-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-seg-rotas-fuga-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Saídas de Emergência</div><input type="number" class="rider-input" id="teatro-seg-rotas-fuga-saidas" disabled></div>
+                        <div><div class="rider-label">Sinalização Luminosa?</div><select class="rider-input" id="teatro-seg-rotas-fuga-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Desobstruída?</div><select class="rider-input" id="teatro-seg-rotas-fuga-desobstruida" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="teatro-seg-rotas-fuga-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Alvarás e Licenças</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-seg-alvaras-sim" data-onchange="toggleCampos('teatro-seg-alvaras')"><label for="teatro-seg-alvaras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="teatro-seg-alvaras-nao" data-onchange="toggleCampos('teatro-seg-alvaras')"><label for="teatro-seg-alvaras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="teatro-seg-alvaras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Funcionamento Válido?</div><select class="rider-input" id="teatro-seg-alvaras-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Sanitário Válido?</div><select class="rider-input" id="teatro-seg-alvaras-sanitario" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Outros?</div><input type="text" class="rider-input" id="teatro-seg-alvaras-outros" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="teatro-seg-alvaras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <button class="btn btn-success" data-onclick="saveFormTeatro()">✓ SALVAR TEATRO</button>
+        </div>
+    </div>
+
+    <!-- AUDITÓRIO - 8 SEÇÕES + PALCO - COMPLETO -->
+    <div id="auditorio" class="content">
+        <button class="btn" style="background: #999; color: white; margin-bottom: 15px;" data-onclick="showTab('menu')">← Voltar</button>
+        <div class="equipamento-card">
+            <h3>🎤 INVENTÁRIO - AUDITÓRIO</h3>
+            
+            <div class="section-title">📌 IDENTIFICAÇÃO DO AUDITÓRIO</div>
+            <div class="form-group"><label>Nome do Auditório</label><input type="text" id="auditorio-nome" placeholder="Nome"></div>
+            <div class="form-group"><label>Endereço Completo</label><textarea id="auditorio-endereco" placeholder="Endereço"></textarea></div>
+            <div class="form-group"><label>Telefone</label><input type="text" id="auditorio-telefone" placeholder="(00) 0000-0000"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="auditorio-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Responsável</label><input type="text" id="auditorio-responsavel"></div>
+            <div class="form-group"><label>Capacidade (pessoas)</label><input type="number" id="auditorio-capacidade"></div>
+            <div class="form-group"><label>Observações da Identificação</label><textarea id="auditorio-id-obs" placeholder="Informações adicionais"></textarea></div>
+
+            <!-- Adicionar Fotos - AUDITÓRIO -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="auditorio-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="auditorio-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="auditorio-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('auditorio')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos - AUDITÓRIO -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="auditorio-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="auditorio-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="auditorio-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('auditorio')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- PALCO - NOVO -->
+            <div class="section-title">🎭 PALCO - NOVO</div>
+            <div class="rider-section">
+                <h4>Possui Palco?</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-palco-sim" data-onchange="toggleCampos('auditorio-palco')"><label for="auditorio-palco-sim">( ) Sim</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-palco-nao" data-onchange="toggleCampos('auditorio-palco')"><label for="auditorio-palco-nao">( ) Não</label></div>
+                </div>
+                <div id="auditorio-palco-campos" class="campos-desabilitados">
+                    <div class="form-group"><div class="rider-label">Medida da Boca (Largura m)</div><input type="number" class="rider-input" id="auditorio-palco-boca" disabled></div>
+                    <div class="form-group"><div class="rider-label">Profundidade (m)</div><input type="number" class="rider-input" id="auditorio-palco-prof" disabled></div>
+                    <div class="form-group"><div class="rider-label">Largura (m)</div><input type="number" class="rider-input" id="auditorio-palco-larg" disabled></div>
+                    <div class="form-group"><div class="rider-label">Altura em Relação à Plateia (m)</div><input type="number" class="rider-input" id="auditorio-palco-altura" disabled></div>
+                    
+                    <div class="rider-section" style="margin-top: 12px;">
+                        <h4 style="margin-top: 0;">Possui Rampa de Acesso?</h4>
+                        <div class="checkbox-box-top">
+                            <div class="checkbox-item"><input type="checkbox" id="auditorio-palco-rampa-sim" data-onchange="toggleCampos('auditorio-palco-rampa')"><label for="auditorio-palco-rampa-sim">( ) Sim</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="auditorio-palco-rampa-nao" data-onchange="toggleCampos('auditorio-palco-rampa')"><label for="auditorio-palco-rampa-nao">( ) Não</label></div>
+                        </div>
+                        <div id="auditorio-palco-rampa-campos" class="campos-desabilitados">
+                            <div class="rider-row">
+                                <div><div class="rider-label">Inclinação (%)</div><input type="number" class="rider-input" id="auditorio-palco-rampa-incl" disabled></div>
+                                <div><div class="rider-label">Largura (m)</div><input type="number" class="rider-input" id="auditorio-palco-rampa-larg" disabled></div>
+                                <div><div class="rider-label">Condição</div><select class="rider-input" id="auditorio-palco-rampa-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1. VÍDEO E PROJEÇÃO -->
+            <div class="section-title">1️⃣ VÍDEO E PROJEÇÃO (6 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Projetor</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-projetor-sim" data-onchange="toggleCampos('auditorio-projetor')"><label for="auditorio-projetor-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-projetor-nao" data-onchange="toggleCampos('auditorio-projetor')"><label for="auditorio-projetor-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-projetor-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="auditorio-projetor-desc" disabled></div>
+                        <div><div class="rider-label">Tamanho/Polegadas</div><input type="text" class="rider-input" id="auditorio-projetor-tam" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-projetor-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Painel de LED</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-painel-led-sim" data-onchange="toggleCampos('auditorio-painel-led')"><label for="auditorio-painel-led-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-painel-led-nao" data-onchange="toggleCampos('auditorio-painel-led')"><label for="auditorio-painel-led-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-painel-led-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="auditorio-painel-led-desc" disabled></div>
+                        <div><div class="rider-label">Tamanho (m)</div><input type="text" class="rider-input" id="auditorio-painel-led-tam" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-painel-led-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Tela de Projeção</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-tela-sim" data-onchange="toggleCampos('auditorio-tela')"><label for="auditorio-tela-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-tela-nao" data-onchange="toggleCampos('auditorio-tela')"><label for="auditorio-tela-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-tela-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-tela-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-tela-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="auditorio-tela-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Retornos de Palco</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-retornos-sim" data-onchange="toggleCampos('auditorio-retornos')"><label for="auditorio-retornos-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-retornos-nao" data-onchange="toggleCampos('auditorio-retornos')"><label for="auditorio-retornos-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-retornos-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-retornos-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-retornos-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-retornos-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Passador de Slides</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-passador-sim" data-onchange="toggleCampos('auditorio-passador')"><label for="auditorio-passador-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-passador-nao" data-onchange="toggleCampos('auditorio-passador')"><label for="auditorio-passador-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-passador-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="auditorio-passador-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-passador-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-passador-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Matriz de Vídeo</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-matriz-sim" data-onchange="toggleCampos('auditorio-matriz')"><label for="auditorio-matriz-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-matriz-nao" data-onchange="toggleCampos('auditorio-matriz')"><label for="auditorio-matriz-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-matriz-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="auditorio-matriz-desc" disabled></div>
+                        <div><div class="rider-label">Entradas/Saídas</div><input type="text" class="rider-input" id="auditorio-matriz-esp" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-matriz-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. SONOPLASTIA -->
+            <div class="section-title">2️⃣ SONOPLASTIA (6 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Mesa de Som</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mesa-som-sim" data-onchange="toggleCampos('auditorio-mesa-som')"><label for="auditorio-mesa-som-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mesa-som-nao" data-onchange="toggleCampos('auditorio-mesa-som')"><label for="auditorio-mesa-som-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-mesa-som-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="auditorio-mesa-som-desc" disabled></div>
+                        <div><div class="rider-label">Canais</div><input type="number" class="rider-input" id="auditorio-mesa-som-canais" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-mesa-som-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>P.A. (Caixas Acústicas)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-pa-sim" data-onchange="toggleCampos('auditorio-pa')"><label for="auditorio-pa-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-pa-nao" data-onchange="toggleCampos('auditorio-pa')"><label for="auditorio-pa-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-pa-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="auditorio-pa-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-pa-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-pa-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Microfone Lapela</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mic-lapela-sim" data-onchange="toggleCampos('auditorio-mic-lapela')"><label for="auditorio-mic-lapela-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mic-lapela-nao" data-onchange="toggleCampos('auditorio-mic-lapela')"><label for="auditorio-mic-lapela-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-mic-lapela-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-mic-lapela-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-mic-lapela-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-mic-lapela-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Headset / Microfone Sem Fio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-headset-sim" data-onchange="toggleCampos('auditorio-headset')"><label for="auditorio-headset-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-headset-nao" data-onchange="toggleCampos('auditorio-headset')"><label for="auditorio-headset-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-headset-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="auditorio-headset-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-headset-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-headset-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Microfone de Mão</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mic-mao-sim" data-onchange="toggleCampos('auditorio-mic-mao')"><label for="auditorio-mic-mao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mic-mao-nao" data-onchange="toggleCampos('auditorio-mic-mao')"><label for="auditorio-mic-mao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-mic-mao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-mic-mao-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-mic-mao-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-mic-mao-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Tribuna com Microfone Gooseneck</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-tribuna-sim" data-onchange="toggleCampos('auditorio-tribuna')"><label for="auditorio-tribuna-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-tribuna-nao" data-onchange="toggleCampos('auditorio-tribuna')"><label for="auditorio-tribuna-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-tribuna-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-tribuna-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-tribuna-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-tribuna-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. INFRAESTRUTURA DE PALCO -->
+            <div class="section-title">3️⃣ INFRAESTRUTURA DE PALCO (5 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Tribuna / Podium</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-tribuna-palco-sim" data-onchange="toggleCampos('auditorio-tribuna-palco')"><label for="auditorio-tribuna-palco-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-tribuna-palco-nao" data-onchange="toggleCampos('auditorio-tribuna-palco')"><label for="auditorio-tribuna-palco-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-tribuna-palco-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="auditorio-tribuna-palco-mat" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-tribuna-palco-qtd" disabled></div>
+                        <div><div class="rider-label">Observações</div><input type="text" class="rider-input" id="auditorio-tribuna-palco-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Praticáveis</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-praticavel-sim" data-onchange="toggleCampos('auditorio-praticavel')"><label for="auditorio-praticavel-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-praticavel-nao" data-onchange="toggleCampos('auditorio-praticavel')"><label for="auditorio-praticavel-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-praticavel-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-praticavel-qtd" disabled></div>
+                        <div><div class="rider-label">Dimensões (L x C)</div><input type="text" class="rider-input" id="auditorio-praticavel-dim" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="auditorio-praticavel-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Internet Alta Velocidade</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-internet-sim" data-onchange="toggleCampos('auditorio-internet')"><label for="auditorio-internet-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-internet-nao" data-onchange="toggleCampos('auditorio-internet')"><label for="auditorio-internet-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-internet-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Velocidade (Mbps)</div><input type="number" class="rider-input" id="auditorio-internet-vel" disabled></div>
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-internet-tipo" disabled></div>
+                        <div><div class="rider-label">Dedicada?</div><select class="rider-input" id="auditorio-internet-ded" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Câmeras PTZ</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-ptz-sim" data-onchange="toggleCampos('auditorio-ptz')"><label for="auditorio-ptz-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-ptz-nao" data-onchange="toggleCampos('auditorio-ptz')"><label for="auditorio-ptz-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-ptz-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="auditorio-ptz-desc" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-ptz-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-ptz-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Computador de Palco</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-pc-palco-sim" data-onchange="toggleCampos('auditorio-pc-palco')"><label for="auditorio-pc-palco-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-pc-palco-nao" data-onchange="toggleCampos('auditorio-pc-palco')"><label for="auditorio-pc-palco-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-pc-palco-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Processador</div><input type="text" class="rider-input" id="auditorio-pc-palco-proc" disabled></div>
+                        <div><div class="rider-label">RAM</div><input type="text" class="rider-input" id="auditorio-pc-palco-ram" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-pc-palco-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. ILUMINAÇÃO E CLIMATIZAÇÃO -->
+            <div class="section-title">4️⃣ ILUMINAÇÃO E CLIMATIZAÇÃO (4 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Ar-Condicionado</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-ac-sim" data-onchange="toggleCampos('auditorio-ac')"><label for="auditorio-ac-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-ac-nao" data-onchange="toggleCampos('auditorio-ac')"><label for="auditorio-ac-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-ac-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-ac-tipo" disabled></div>
+                        <div><div class="rider-label">BTUs</div><input type="number" class="rider-input" id="auditorio-ac-btu" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-ac-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Iluminação de Palco</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-luz-palco-sim" data-onchange="toggleCampos('auditorio-luz-palco')"><label for="auditorio-luz-palco-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-luz-palco-nao" data-onchange="toggleCampos('auditorio-luz-palco')"><label for="auditorio-luz-palco-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-luz-palco-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-luz-palco-tipo" disabled></div>
+                        <div><div class="rider-label">Dimerizável?</div><select class="rider-input" id="auditorio-luz-palco-dim" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-luz-palco-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Iluminação de Plateia</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-luz-plateia-sim" data-onchange="toggleCampos('auditorio-luz-plateia')"><label for="auditorio-luz-plateia-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-luz-plateia-nao" data-onchange="toggleCampos('auditorio-luz-plateia')"><label for="auditorio-luz-plateia-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-luz-plateia-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Dimerizável?</div><select class="rider-input" id="auditorio-luz-plateia-dim" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Controle</div><input type="text" class="rider-input" id="auditorio-luz-plateia-controle" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-luz-plateia-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Iluminação Decorativa RGBW</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-luz-rgb-sim" data-onchange="toggleCampos('auditorio-luz-rgb')"><label for="auditorio-luz-rgb-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-luz-rgb-nao" data-onchange="toggleCampos('auditorio-luz-rgb')"><label for="auditorio-luz-rgb-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-luz-rgb-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-luz-rgb-tipo" disabled></div>
+                        <div><div class="rider-label">Qtd</div><input type="number" class="rider-input" id="auditorio-luz-rgb-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="auditorio-luz-rgb-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. CONFIGURAÇÃO DO ESPAÇO -->
+            <div class="section-title">5️⃣ CONFIGURAÇÃO DO ESPAÇO (3 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Cadeiras</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-cadeiras-sim" data-onchange="toggleCampos('auditorio-cadeiras')"><label for="auditorio-cadeiras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-cadeiras-nao" data-onchange="toggleCampos('auditorio-cadeiras')"><label for="auditorio-cadeiras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-cadeiras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="auditorio-cadeiras-tipo" disabled></div>
+                        <div><div class="rider-label">Fixas/Removíveis?</div><select class="rider-input" id="auditorio-cadeiras-fixas" disabled><option>Fixas</option><option>Removíveis</option></select></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="auditorio-cadeiras-qtd" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Hall de Entrada</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-hall-sim" data-onchange="toggleCampos('auditorio-hall')"><label for="auditorio-hall-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-hall-nao" data-onchange="toggleCampos('auditorio-hall')"><label for="auditorio-hall-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-hall-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Área (m²)</div><input type="number" class="rider-input" id="auditorio-hall-area" disabled></div>
+                        <div><div class="rider-label">Capacidade</div><input type="number" class="rider-input" id="auditorio-hall-cap" disabled></div>
+                        <div><div class="rider-label">Para Café?</div><select class="rider-input" id="auditorio-hall-cafe" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Camarins</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-camarins-sim" data-onchange="toggleCampos('auditorio-camarins')"><label for="auditorio-camarins-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-camarins-nao" data-onchange="toggleCampos('auditorio-camarins')"><label for="auditorio-camarins-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-camarins-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="auditorio-camarins-qtd" disabled></div>
+                        <div><div class="rider-label">Banheiro Privativo?</div><select class="rider-input" id="auditorio-camarins-banh" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="auditorio-camarins-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. MOBILIÁRIO -->
+            <div class="section-title">6️⃣ MOBILIÁRIO (3 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Mesas para Mesa-Redonda</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mesa-redonda-sim" data-onchange="toggleCampos('auditorio-mesa-redonda')"><label for="auditorio-mesa-redonda-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mesa-redonda-nao" data-onchange="toggleCampos('auditorio-mesa-redonda')"><label for="auditorio-mesa-redonda-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-mesa-redonda-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="auditorio-mesa-redonda-qtd" disabled></div>
+                        <div><div class="rider-label">Diâmetro (m)</div><input type="number" class="rider-input" id="auditorio-mesa-redonda-diam" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="auditorio-mesa-redonda-mat" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Mesas para Café</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mesa-cafe-sim" data-onchange="toggleCampos('auditorio-mesa-cafe')"><label for="auditorio-mesa-cafe-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-mesa-cafe-nao" data-onchange="toggleCampos('auditorio-mesa-cafe')"><label for="auditorio-mesa-cafe-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-mesa-cafe-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="auditorio-mesa-cafe-qtd" disabled></div>
+                        <div><div class="rider-label">Tamanho</div><input type="text" class="rider-input" id="auditorio-mesa-cafe-tam" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="auditorio-mesa-cafe-mat" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Toalhas de Mesa</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-toalhas-sim" data-onchange="toggleCampos('auditorio-toalhas')"><label for="auditorio-toalhas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-toalhas-nao" data-onchange="toggleCampos('auditorio-toalhas')"><label for="auditorio-toalhas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-toalhas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="auditorio-toalhas-qtd" disabled></div>
+                        <div><div class="rider-label">Cores</div><input type="text" class="rider-input" id="auditorio-toalhas-cores" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="auditorio-toalhas-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. ACESSIBILIDADE -->
+            <div class="section-title">7️⃣ ACESSIBILIDADE (4 ITENS)</div>
+
+            <div class="rider-section">
+                <h4>Acesso ao Palco</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-acesso-palco-sim" data-onchange="toggleCampos('auditorio-acesso-palco')"><label for="auditorio-acesso-palco-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-acesso-palco-nao" data-onchange="toggleCampos('auditorio-acesso-palco')"><label for="auditorio-acesso-palco-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-acesso-palco-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><select class="rider-input" id="auditorio-acesso-palco-tipo" disabled><option>Rampa</option><option>Elevador</option><option>Plataforma</option></select></div>
+                        <div><div class="rider-label">Altura/Inclinação</div><input type="text" class="rider-input" id="auditorio-acesso-palco-alt" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="auditorio-acesso-palco-cond" disabled><option>Ótimo</option><option>Bom</option><option>Ruim</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Rotas Acessíveis</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-rotas-sim" data-onchange="toggleCampos('auditorio-rotas')"><label for="auditorio-rotas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-rotas-nao" data-onchange="toggleCampos('auditorio-rotas')"><label for="auditorio-rotas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-rotas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Rampas?</div><select class="rider-input" id="auditorio-rotas-rampas" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Elevadores?</div><select class="rider-input" id="auditorio-rotas-elevadores" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Onde?</div><input type="text" class="rider-input" id="auditorio-rotas-obs" disabled></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Assentos PNE</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-pne-sim" data-onchange="toggleCampos('auditorio-pne')"><label for="auditorio-pne-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-pne-nao" data-onchange="toggleCampos('auditorio-pne')"><label for="auditorio-pne-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-pne-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Cadeirantes</div><input type="number" class="rider-input" id="auditorio-pne-cadeira" disabled></div>
+                        <div><div class="rider-label">Obesos</div><input type="number" class="rider-input" id="auditorio-pne-obeso" disabled></div>
+                        <div><div class="rider-label">Sinalização?</div><select class="rider-input" id="auditorio-pne-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sanitários Adaptados</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-sanitario-sim" data-onchange="toggleCampos('auditorio-sanitario')"><label for="auditorio-sanitario-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-sanitario-nao" data-onchange="toggleCampos('auditorio-sanitario')"><label for="auditorio-sanitario-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-sanitario-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Masculino?</div><select class="rider-input" id="auditorio-sanitario-masc" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Feminino?</div><select class="rider-input" id="auditorio-sanitario-fem" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Unissex?</div><select class="rider-input" id="auditorio-sanitario-uni" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 8. INFORMAÇÕES COMPLEMENTARES -->
+            <div class="section-title">8️⃣ INFORMAÇÕES COMPLEMENTARES</div>
+            <div class="form-group"><label>Descrição Geral / Observações</label><textarea id="auditorio-obs" placeholder="Informações adicionais sobre o auditório"></textarea></div>
+            
+            <!-- SEGURANÇA E DOCUMENTAÇÃO LEGAL - NOVO -->
+            <div class="section-title">🔒 SEGURANÇA E DOCUMENTAÇÃO LEGAL</div>
+
+            <div class="rider-section">
+                <h4>AVCB (Alvará de Corpo de Bombeiros)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-seg-avcb-sim" data-onchange="toggleCampos('auditorio-seg-avcb')"><label for="auditorio-seg-avcb-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-seg-avcb-nao" data-onchange="toggleCampos('auditorio-seg-avcb')"><label for="auditorio-seg-avcb-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-seg-avcb-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Válido?</div><select class="rider-input" id="auditorio-seg-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="auditorio-seg-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="auditorio-seg-avcb-numero" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="auditorio-seg-avcb-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Extintores de Incêndio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-seg-extintores-sim" data-onchange="toggleCampos('auditorio-seg-extintores')"><label for="auditorio-seg-extintores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-seg-extintores-nao" data-onchange="toggleCampos('auditorio-seg-extintores')"><label for="auditorio-seg-extintores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-seg-extintores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="auditorio-seg-extintores-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo (ABC/CO2)</div><input type="text" class="rider-input" id="auditorio-seg-extintores-tipo" disabled></div>
+                        <div><div class="rider-label">Vencido?</div><select class="rider-input" id="auditorio-seg-extintores-vencido" disabled><option>Não</option><option>Sim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="auditorio-seg-extintores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Rotas de Fuga e Sinalização</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-seg-rotas-fuga-sim" data-onchange="toggleCampos('auditorio-seg-rotas-fuga')"><label for="auditorio-seg-rotas-fuga-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-seg-rotas-fuga-nao" data-onchange="toggleCampos('auditorio-seg-rotas-fuga')"><label for="auditorio-seg-rotas-fuga-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-seg-rotas-fuga-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Saídas de Emergência</div><input type="number" class="rider-input" id="auditorio-seg-rotas-fuga-saidas" disabled></div>
+                        <div><div class="rider-label">Sinalização Luminosa?</div><select class="rider-input" id="auditorio-seg-rotas-fuga-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Desobstruída?</div><select class="rider-input" id="auditorio-seg-rotas-fuga-desobstruida" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="auditorio-seg-rotas-fuga-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Alvarás e Licenças</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-seg-alvaras-sim" data-onchange="toggleCampos('auditorio-seg-alvaras')"><label for="auditorio-seg-alvaras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="auditorio-seg-alvaras-nao" data-onchange="toggleCampos('auditorio-seg-alvaras')"><label for="auditorio-seg-alvaras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="auditorio-seg-alvaras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Funcionamento Válido?</div><select class="rider-input" id="auditorio-seg-alvaras-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Sanitário Válido?</div><select class="rider-input" id="auditorio-seg-alvaras-sanitario" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Outros?</div><input type="text" class="rider-input" id="auditorio-seg-alvaras-outros" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="auditorio-seg-alvaras-obs" disabled></textarea></div>
+                </div>
+            </div>
+            
+            <button class="btn btn-success" data-onclick="saveFormAuditorio()">✓ SALVAR AUDITÓRIO</button>
+        </div>
+    </div>
+
+    <!-- CASA DE CULTURA - 4 BLOCOS COMPLETOS -->
+    <div id="casacultura" class="content">
+        <button class="btn" style="background: #999; color: white; margin-bottom: 15px;" data-onclick="showTab('menu')">← Voltar</button>
+        <div class="equipamento-card">
+            <h3>🏛️ LEVANTAMENTO TÉCNICO - CASA DE CULTURA</h3>
+            
+            <div class="section-title">📌 IDENTIFICAÇÃO</div>
+            <div class="form-group"><label>Nome da Casa de Cultura</label><input type="text" id="casacultura-nome" placeholder="Nome"></div>
+            <div class="form-group"><label>Endereço Completo</label><textarea id="casacultura-endereco" placeholder="Endereço"></textarea></div>
+            <div class="form-group"><label>Telefone</label><input type="text" id="casacultura-telefone" placeholder="(00) 0000-0000"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="casacultura-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Responsável</label><input type="text" id="casacultura-responsavel"></div>
+            <div class="form-group"><label>Observações da Identificação</label><textarea id="casacultura-id-obs" placeholder="Informações adicionais"></textarea></div>
+
+            <!-- BLOCO 1: INFRAESTRUTURA FÍSICA E ARQUITETÔNICA -->
+            <div class="section-title">1️⃣ INFRAESTRUTURA FÍSICA E ARQUITETÔNICA</div>
+
+            <!-- 1.1 ELÉTRICA -->
+            <div class="rider-section">
+                <h4>Quadro de Luz / Painel Elétrico</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-quadro-luz-sim" data-onchange="toggleCampos('cc-quadro-luz')"><label for="cc-quadro-luz-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-quadro-luz-nao" data-onchange="toggleCampos('cc-quadro-luz')"><label for="cc-quadro-luz-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-quadro-luz-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Voltagem</div><input type="text" class="rider-input" id="cc-quadro-luz-volt" disabled></div>
+                        <div><div class="rider-label">Capacidade (A)</div><input type="text" class="rider-input" id="cc-quadro-luz-cap" disabled></div>
+                        <div><div class="rider-label">Setor</div><input type="text" class="rider-input" id="cc-quadro-luz-setor" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-quadro-luz-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-quadro-luz-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-quadro-luz-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Fiação e Cabeamento Elétrico</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-fiacao-sim" data-onchange="toggleCampos('cc-fiacao')"><label for="cc-fiacao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-fiacao-nao" data-onchange="toggleCampos('cc-fiacao')"><label for="cc-fiacao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-fiacao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Condição Visual</div><input type="text" class="rider-input" id="cc-fiacao-cond" disabled></div>
+                        <div><div class="rider-label">Isolamento Íntegro?</div><select class="rider-input" id="cc-fiacao-isol" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Setor</div><input type="text" class="rider-input" id="cc-fiacao-setor" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-fiacao-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-fiacao-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-fiacao-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Tomadas e Extensões</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-tomadas-sim" data-onchange="toggleCampos('cc-tomadas')"><label for="cc-tomadas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-tomadas-nao" data-onchange="toggleCampos('cc-tomadas')"><label for="cc-tomadas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-tomadas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade Suficiente?</div><select class="rider-input" id="cc-tomadas-qtd" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-tomadas-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Setor</div><input type="text" class="rider-input" id="cc-tomadas-setor" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-tomadas-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-tomadas-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-tomadas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 1.2 ACÚSTICA -->
+            <div class="rider-section">
+                <h4>Isolamento Acústico</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-isolamento-acustico-sim" data-onchange="toggleCampos('cc-isolamento-acustico')"><label for="cc-isolamento-acustico-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-isolamento-acustico-nao" data-onchange="toggleCampos('cc-isolamento-acustico')"><label for="cc-isolamento-acustico-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-isolamento-acustico-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo Material</div><input type="text" class="rider-input" id="cc-isolamento-acustico-tipo" disabled></div>
+                        <div><div class="rider-label">Cobertura (%)</div><input type="number" class="rider-input" id="cc-isolamento-acustico-cob" disabled></div>
+                        <div><div class="rider-label">Setor</div><input type="text" class="rider-input" id="cc-isolamento-acustico-setor" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-isolamento-acustico-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-isolamento-acustico-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-isolamento-acustico-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Piso Acústico</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-piso-acustico-sim" data-onchange="toggleCampos('cc-piso-acustico')"><label for="cc-piso-acustico-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-piso-acustico-nao" data-onchange="toggleCampos('cc-piso-acustico')"><label for="cc-piso-acustico-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-piso-acustico-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="cc-piso-acustico-mat" disabled></div>
+                        <div><div class="rider-label">Integridade</div><select class="rider-input" id="cc-piso-acustico-integ" disabled><option>Íntegro</option><option>Danificado</option></select></div>
+                        <div><div class="rider-label">Setor</div><input type="text" class="rider-input" id="cc-piso-acustico-setor" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-piso-acustico-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-piso-acustico-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-piso-acustico-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 1.3 CLIMATIZAÇÃO -->
+            <div class="rider-section">
+                <h4>Sistema de Ar-Condicionado</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-ar-condicionado-sim" data-onchange="toggleCampos('cc-ar-condicionado')"><label for="cc-ar-condicionado-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-ar-condicionado-nao" data-onchange="toggleCampos('cc-ar-condicionado')"><label for="cc-ar-condicionado-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-ar-condicionado-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="cc-ar-condicionado-tipo" disabled></div>
+                        <div><div class="rider-label">BTUs</div><input type="number" class="rider-input" id="cc-ar-condicionado-btu" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-ar-condicionado-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-ar-condicionado-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-ar-condicionado-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-ar-condicionado-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sistema de Ventilação Natural</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-ventilacao-sim" data-onchange="toggleCampos('cc-ventilacao')"><label for="cc-ventilacao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-ventilacao-nao" data-onchange="toggleCampos('cc-ventilacao')"><label for="cc-ventilacao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-ventilacao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo Abertura</div><input type="text" class="rider-input" id="cc-ventilacao-tipo" disabled></div>
+                        <div><div class="rider-label">Adequação</div><select class="rider-input" id="cc-ventilacao-adeq" disabled><option>Adequada</option><option>Insuficiente</option></select></div>
+                        <div><div class="rider-label">Setor</div><input type="text" class="rider-input" id="cc-ventilacao-setor" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-ventilacao-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-ventilacao-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-ventilacao-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 1.4 ACESSIBILIDADE -->
+            <div class="rider-section">
+                <h4>Rampas de Acesso</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-rampas-sim" data-onchange="toggleCampos('cc-rampas')"><label for="cc-rampas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-rampas-nao" data-onchange="toggleCampos('cc-rampas')"><label for="cc-rampas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-rampas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Inclinação (%)</div><input type="number" class="rider-input" id="cc-rampas-incl" disabled></div>
+                        <div><div class="rider-label">Piso Tátil?</div><select class="rider-input" id="cc-rampas-tatil" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Corrimão?</div><select class="rider-input" id="cc-rampas-corrimao" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-rampas-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-rampas-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-rampas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Elevadores / Plataformas Elevatórias</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-elevador-sim" data-onchange="toggleCampos('cc-elevador')"><label for="cc-elevador-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-elevador-nao" data-onchange="toggleCampos('cc-elevador')"><label for="cc-elevador-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-elevador-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="cc-elevador-tipo" disabled></div>
+                        <div><div class="rider-label">Capacidade (kg)</div><input type="number" class="rider-input" id="cc-elevador-cap" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-elevador-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-elevador-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-elevador-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-elevador-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sanitários Acessíveis (PNE)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-sanitarios-pne-sim" data-onchange="toggleCampos('cc-sanitarios-pne')"><label for="cc-sanitarios-pne-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-sanitarios-pne-nao" data-onchange="toggleCampos('cc-sanitarios-pne')"><label for="cc-sanitarios-pne-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-sanitarios-pne-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-sanitarios-pne-qtd" disabled></div>
+                        <div><div class="rider-label">Gênero</div><input type="text" class="rider-input" id="cc-sanitarios-pne-genero" disabled></div>
+                        <div><div class="rider-label">Acessibilidade</div><select class="rider-input" id="cc-sanitarios-pne-aces" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-sanitarios-pne-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-sanitarios-pne-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-sanitarios-pne-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- BLOCO 2: EQUIPAMENTOS E TECNOLOGIAS -->
+            <div class="section-title">2️⃣ EQUIPAMENTOS E TECNOLOGIAS</div>
+
+            <!-- 2.1 ILUMINAÇÃO CÊNICA -->
+            <div class="rider-section">
+                <h4>Luminárias / Refletores</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-luminarias-sim" data-onchange="toggleCampos('cc-luminarias')"><label for="cc-luminarias-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-luminarias-nao" data-onchange="toggleCampos('cc-luminarias')"><label for="cc-luminarias-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-luminarias-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="cc-luminarias-tipo" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-luminarias-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-luminarias-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-luminarias-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-luminarias-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-luminarias-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Mesa de Luz / Controle DMX</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-mesa-luz-sim" data-onchange="toggleCampos('cc-mesa-luz')"><label for="cc-mesa-luz-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-mesa-luz-nao" data-onchange="toggleCampos('cc-mesa-luz')"><label for="cc-mesa-luz-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-mesa-luz-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="cc-mesa-luz-modelo" disabled></div>
+                        <div><div class="rider-label">Canais</div><input type="number" class="rider-input" id="cc-mesa-luz-canais" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-mesa-luz-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-mesa-luz-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-mesa-luz-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-mesa-luz-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 2.2 SONORIZAÇÃO -->
+            <div class="rider-section">
+                <h4>Mesa de Som / Mixer</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-mesa-som-sim" data-onchange="toggleCampos('cc-mesa-som')"><label for="cc-mesa-som-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-mesa-som-nao" data-onchange="toggleCampos('cc-mesa-som')"><label for="cc-mesa-som-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-mesa-som-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Modelo</div><input type="text" class="rider-input" id="cc-mesa-som-modelo" disabled></div>
+                        <div><div class="rider-label">Canais</div><input type="number" class="rider-input" id="cc-mesa-som-canais" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-mesa-som-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-mesa-som-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-mesa-som-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-mesa-som-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sistema de P.A. (Alto-Falantes)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-pa-sim" data-onchange="toggleCampos('cc-pa')"><label for="cc-pa-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-pa-nao" data-onchange="toggleCampos('cc-pa')"><label for="cc-pa-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-pa-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo/Potência</div><input type="text" class="rider-input" id="cc-pa-tipo" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-pa-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-pa-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-pa-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-pa-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-pa-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Microfones</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-microfones-sim" data-onchange="toggleCampos('cc-microfones')"><label for="cc-microfones-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-microfones-nao" data-onchange="toggleCampos('cc-microfones')"><label for="cc-microfones-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-microfones-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo (Sem Fio/Com Fio)</div><input type="text" class="rider-input" id="cc-microfones-tipo" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-microfones-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-microfones-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-microfones-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-microfones-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-microfones-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 2.3 PROJEÇÃO -->
+            <div class="rider-section">
+                <h4>Projetor / Projeção</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-projetor-sim" data-onchange="toggleCampos('cc-projetor')"><label for="cc-projetor-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-projetor-nao" data-onchange="toggleCampos('cc-projetor')"><label for="cc-projetor-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-projetor-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo/Lumens</div><input type="text" class="rider-input" id="cc-projetor-tipo" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-projetor-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-projetor-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-projetor-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-projetor-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-projetor-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Tela de Projeção / Display</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-tela-projecao-sim" data-onchange="toggleCampos('cc-tela-projecao')"><label for="cc-tela-projecao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-tela-projecao-nao" data-onchange="toggleCampos('cc-tela-projecao')"><label for="cc-tela-projecao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-tela-projecao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tamanho/Polegadas</div><input type="text" class="rider-input" id="cc-tela-projecao-tam" disabled></div>
+                        <div><div class="rider-label">Tipo (Retratil/Fixa)</div><input type="text" class="rider-input" id="cc-tela-projecao-tipo" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="cc-tela-projecao-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-tela-projecao-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-tela-projecao-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-tela-projecao-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 2.4 MOBILIÁRIO -->
+            <div class="rider-section">
+                <h4>Cadeiras / Assentos</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-cadeiras-sim" data-onchange="toggleCampos('cc-cadeiras')"><label for="cc-cadeiras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-cadeiras-nao" data-onchange="toggleCampos('cc-cadeiras')"><label for="cc-cadeiras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-cadeiras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="cc-cadeiras-tipo" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-cadeiras-qtd" disabled></div>
+                        <div><div class="rider-label">Setor</div><input type="text" class="rider-input" id="cc-cadeiras-setor" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-cadeiras-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-cadeiras-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-cadeiras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Mesas de Trabalho</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-mesas-sim" data-onchange="toggleCampos('cc-mesas')"><label for="cc-mesas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-mesas-nao" data-onchange="toggleCampos('cc-mesas')"><label for="cc-mesas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-mesas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="cc-mesas-tipo" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-mesas-qtd" disabled></div>
+                        <div><div class="rider-label">Dimensões</div><input type="text" class="rider-input" id="cc-mesas-dim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-mesas-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-mesas-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-mesas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- BLOCO 3: AMBIENTES E ESPAÇOS -->
+            <div class="section-title">3️⃣ AMBIENTES E ESPAÇOS</div>
+
+            <div class="rider-section">
+                <h4>Auditório / Espaço Principal</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-auditorio-sim" data-onchange="toggleCampos('cc-auditorio')"><label for="cc-auditorio-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-auditorio-nao" data-onchange="toggleCampos('cc-auditorio')"><label for="cc-auditorio-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-auditorio-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Capacidade</div><input type="number" class="rider-input" id="cc-auditorio-cap" disabled></div>
+                        <div><div class="rider-label">Área (m²)</div><input type="number" class="rider-input" id="cc-auditorio-area" disabled></div>
+                        <div><div class="rider-label">Uso Múltiplo?</div><select class="rider-input" id="cc-auditorio-multiplo" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-auditorio-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-auditorio-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-auditorio-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Camarins</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-camarins-sim" data-onchange="toggleCampos('cc-camarins')"><label for="cc-camarins-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-camarins-nao" data-onchange="toggleCampos('cc-camarins')"><label for="cc-camarins-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-camarins-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-camarins-qtd" disabled></div>
+                        <div><div class="rider-label">Com Banheiro?</div><select class="rider-input" id="cc-camarins-banh" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Espelho e Bancada?</div><select class="rider-input" id="cc-camarins-espelho" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-camarins-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-camarins-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-camarins-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Salas Multiuso / Oficinas</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-salas-multiuso-sim" data-onchange="toggleCampos('cc-salas-multiuso')"><label for="cc-salas-multiuso-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-salas-multiuso-nao" data-onchange="toggleCampos('cc-salas-multiuso')"><label for="cc-salas-multiuso-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-salas-multiuso-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-salas-multiuso-qtd" disabled></div>
+                        <div><div class="rider-label">Área Média (m²)</div><input type="number" class="rider-input" id="cc-salas-multiuso-area" disabled></div>
+                        <div><div class="rider-label">Equipadas?</div><select class="rider-input" id="cc-salas-multiuso-equip" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-salas-multiuso-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-salas-multiuso-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-salas-multiuso-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Galeria de Arte</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-galeria-sim" data-onchange="toggleCampos('cc-galeria')"><label for="cc-galeria-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-galeria-nao" data-onchange="toggleCampos('cc-galeria')"><label for="cc-galeria-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-galeria-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Área (m²)</div><input type="number" class="rider-input" id="cc-galeria-area" disabled></div>
+                        <div><div class="rider-label">Iluminação Apropriada?</div><select class="rider-input" id="cc-galeria-luz" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Parede Neutra?</div><select class="rider-input" id="cc-galeria-parede" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-galeria-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-galeria-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-galeria-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Docas / Entradas de Carga</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-docas-sim" data-onchange="toggleCampos('cc-docas')"><label for="cc-docas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-docas-nao" data-onchange="toggleCampos('cc-docas')"><label for="cc-docas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-docas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-docas-qtd" disabled></div>
+                        <div><div class="rider-label">Dimensões (L x A)</div><input type="text" class="rider-input" id="cc-docas-dim" disabled></div>
+                        <div><div class="rider-label">Acesso Facilitado?</div><select class="rider-input" id="cc-docas-acesso" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-docas-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-docas-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-docas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Área Externa</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-area-externa-sim" data-onchange="toggleCampos('cc-area-externa')"><label for="cc-area-externa-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-area-externa-nao" data-onchange="toggleCampos('cc-area-externa')"><label for="cc-area-externa-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-area-externa-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Área Total (m²)</div><input type="number" class="rider-input" id="cc-area-externa-area" disabled></div>
+                        <div><div class="rider-label">Tipo de Piso</div><input type="text" class="rider-input" id="cc-area-externa-piso" disabled></div>
+                        <div><div class="rider-label">Possui Cobertura?</div><select class="rider-input" id="cc-area-externa-cobertura" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="rider-row">
+                        <div><div class="rider-label">Iluminação?</div><select class="rider-input" id="cc-area-externa-ilum" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Drenagem Adequada?</div><select class="rider-input" id="cc-area-externa-drenagem" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Acessível?</div><select class="rider-input" id="cc-area-externa-acessivel" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Estado Conservação</div><select class="rider-input" id="cc-area-externa-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    <div class="form-group"><div class="rider-label">Ação Necessária</div><select class="rider-input" id="cc-area-externa-acao" disabled><option>Nenhuma</option><option>Manutenção</option><option>Troca</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-area-externa-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- BLOCO 4: SEGURANÇA E DOCUMENTAÇÃO LEGAL -->
+            <div class="section-title">4️⃣ SEGURANÇA E DOCUMENTAÇÃO LEGAL</div>
+
+            <div class="rider-section">
+                <h4>AVCB (Alvará de Corpo de Bombeiros)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-avcb-sim" data-onchange="toggleCampos('cc-avcb')"><label for="cc-avcb-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-avcb-nao" data-onchange="toggleCampos('cc-avcb')"><label for="cc-avcb-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-avcb-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Válido?</div><select class="rider-input" id="cc-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="cc-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="cc-avcb-numero" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-avcb-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Extintores de Incêndio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-extintores-sim" data-onchange="toggleCampos('cc-extintores')"><label for="cc-extintores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-extintores-nao" data-onchange="toggleCampos('cc-extintores')"><label for="cc-extintores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-extintores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="cc-extintores-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo (ABC/CO2)</div><input type="text" class="rider-input" id="cc-extintores-tipo" disabled></div>
+                        <div><div class="rider-label">Vencido?</div><select class="rider-input" id="cc-extintores-vencido" disabled><option>Não</option><option>Sim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-extintores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Rotas de Fuga e Sinalização</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-rotas-fuga-sim" data-onchange="toggleCampos('cc-rotas-fuga')"><label for="cc-rotas-fuga-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-rotas-fuga-nao" data-onchange="toggleCampos('cc-rotas-fuga')"><label for="cc-rotas-fuga-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-rotas-fuga-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Saídas de Emergência</div><input type="number" class="rider-input" id="cc-rotas-fuga-saidas" disabled></div>
+                        <div><div class="rider-label">Sinalização Luminosa?</div><select class="rider-input" id="cc-rotas-fuga-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Desobstruída?</div><select class="rider-input" id="cc-rotas-fuga-desobstruida" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-rotas-fuga-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Alvarás e Licenças</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="cc-alvaras-sim" data-onchange="toggleCampos('cc-alvaras')"><label for="cc-alvaras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="cc-alvaras-nao" data-onchange="toggleCampos('cc-alvaras')"><label for="cc-alvaras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="cc-alvaras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Funcionamento Válido?</div><select class="rider-input" id="cc-alvaras-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Sanitário Válido?</div><select class="rider-input" id="cc-alvaras-sanitario" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Outros?</div><input type="text" class="rider-input" id="cc-alvaras-outros" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-alvaras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="form-group"><label>Observações Gerais / Recomendações</label><textarea id="casacultura-obs-geral" placeholder="Observações finais do levantamento técnico"></textarea></div>
+
+            <!-- ✅ NOVO: Adicionar Fotos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="casacultura-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="casacultura-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="casacultura-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('casacultura')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- ✅ NOVO: Adicionar Documentos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="casacultura-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="casacultura-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="casacultura-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('casacultura')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <button class="btn btn-success" data-onclick="saveFormCasaCultura()">✓ SALVAR CASA DE CULTURA</button>
+        </div>
+    </div>
+
+    <!-- PRAÇA, BIBLIOTECA, GINÁSIO -->
+    <div id="praca" class="content">
+        <button class="btn" style="background: #999; color: white; margin-bottom: 15px;" data-onclick="showTab('menu')">← Voltar</button>
+        <div class="equipamento-card">
+            <h3>🏞️ INVENTÁRIO TÉCNICO - PRAÇA PÚBLICA</h3>
+            
+            <div class="section-title">📌 IDENTIFICAÇÃO</div>
+            <div class="form-group"><label>Nome da Praça</label><input type="text" id="praca-nome" placeholder="Nome"></div>
+            <div class="form-group"><label>Endereço / Localização</label><textarea id="praca-endereco" placeholder="Endereço completo"></textarea></div>
+            <div class="form-group"><label>Telefone</label><input type="text" id="praca-telefone" placeholder="(00) 0000-0000"></div>
+            <div class="form-group"><label>Email / Contato</label><input type="text" id="praca-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Responsável / Gestor</label><input type="text" id="praca-responsavel"></div>
+            <div class="form-group"><label>Capacidade Estimada (pessoas)</label><input type="number" id="praca-capacidade"></div>
+            <div class="form-group"><label>Observações da Identificação</label><textarea id="praca-id-obs" placeholder="Informações adicionais"></textarea></div>
+
+            <!-- Adicionar Fotos - PRAÇA -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="praca-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="praca-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="praca-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('praca')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos - PRAÇA -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="praca-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="praca-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="praca-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('praca')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- 1. ESTRUTURAS CULTURAIS, HISTÓRICAS E ÁREA DE EVENTOS -->
+            <div class="section-title">1️⃣ ESTRUTURAS CULTURAIS, HISTÓRICAS E ÁREA DE EVENTOS</div>
+
+            <div class="rider-section">
+                <h4>Coreto</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-coreto-sim" data-onchange="toggleCampos('praca-coreto')"><label for="praca-coreto-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-coreto-nao" data-onchange="toggleCampos('praca-coreto')"><label for="praca-coreto-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-coreto-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Diâmetro / Dimensões (m)</div><input type="text" class="rider-input" id="praca-coreto-dim" disabled></div>
+                        <div><div class="rider-label">Com Degraus?</div><select class="rider-input" id="praca-coreto-degraus" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Fiação Elétrica Ativa?</div><select class="rider-input" id="praca-coreto-eletrica" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-coreto-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Espaço para Feiras</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-feiras-sim" data-onchange="toggleCampos('praca-feiras')"><label for="praca-feiras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-feiras-nao" data-onchange="toggleCampos('praca-feiras')"><label for="praca-feiras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-feiras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Plano e Pavimentado?</div><select class="rider-input" id="praca-feiras-pavim" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Capacidade (barracas)</div><input type="number" class="rider-input" id="praca-feiras-cap" disabled></div>
+                        <div><div class="rider-label">Tipo de Piso</div><input type="text" class="rider-input" id="praca-feiras-piso" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-feiras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Monumentos / Estátuas</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-monumentos-sim" data-onchange="toggleCampos('praca-monumentos')"><label for="praca-monumentos-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-monumentos-nao" data-onchange="toggleCampos('praca-monumentos')"><label for="praca-monumentos-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-monumentos-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Nome do Monumento</div><input type="text" class="rider-input" id="praca-monumentos-nome" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="praca-monumentos-qtd" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="praca-monumentos-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-monumentos-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Anfiteatro ao Ar Livre</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-anfiteatro-sim" data-onchange="toggleCampos('praca-anfiteatro')"><label for="praca-anfiteatro-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-anfiteatro-nao" data-onchange="toggleCampos('praca-anfiteatro')"><label for="praca-anfiteatro-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-anfiteatro-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Capacidade de Público</div><input type="number" class="rider-input" id="praca-anfiteatro-cap" disabled></div>
+                        <div><div class="rider-label">Com Arquibancadas?</div><select class="rider-input" id="praca-anfiteatro-arquib" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Condição Geral</div><select class="rider-input" id="praca-anfiteatro-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-anfiteatro-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 2. MOBILIÁRIO URBANO E ÁREAS DE CONVIVÊNCIA -->
+            <div class="section-title">2️⃣ MOBILIÁRIO URBANO E ÁREAS DE CONVIVÊNCIA</div>
+
+            <div class="rider-section">
+                <h4>Bancos da Praça</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-bancos-sim" data-onchange="toggleCampos('praca-bancos')"><label for="praca-bancos-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-bancos-nao" data-onchange="toggleCampos('praca-bancos')"><label for="praca-bancos-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-bancos-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="praca-bancos-qtd" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="praca-bancos-mat" placeholder="Ex: Concreto/Madeira/Ferro" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="praca-bancos-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-bancos-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Mesas de Jogos</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-mesas-jogos-sim" data-onchange="toggleCampos('praca-mesas-jogos')"><label for="praca-mesas-jogos-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-mesas-jogos-nao" data-onchange="toggleCampos('praca-mesas-jogos')"><label for="praca-mesas-jogos-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-mesas-jogos-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="praca-mesas-jogos-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo de Jogo</div><input type="text" class="rider-input" id="praca-mesas-jogos-tipo" placeholder="Ex: Xadrez/Damas" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="praca-mesas-jogos-mat" placeholder="Ex: Concreto/Azulejo" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-mesas-jogos-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Lixeiras Coletivas</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-lixeiras-sim" data-onchange="toggleCampos('praca-lixeiras')"><label for="praca-lixeiras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-lixeiras-nao" data-onchange="toggleCampos('praca-lixeiras')"><label for="praca-lixeiras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-lixeiras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="praca-lixeiras-qtd" disabled></div>
+                        <div><div class="rider-label">Com Separação para Reciclável?</div><select class="rider-input" id="praca-lixeiras-reciclavel" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="praca-lixeiras-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-lixeiras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Bicicletários e Paraciclos</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-bicicletarios-sim" data-onchange="toggleCampos('praca-bicicletarios')"><label for="praca-bicicletarios-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-bicicletarios-nao" data-onchange="toggleCampos('praca-bicicletarios')"><label for="praca-bicicletarios-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-bicicletarios-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="praca-bicicletarios-tipo" placeholder="Ex: Estrutura/Paraciclos" disabled></div>
+                        <div><div class="rider-label">Capacidade (bicicletas)</div><input type="number" class="rider-input" id="praca-bicicletarios-cap" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="praca-bicicletarios-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-bicicletarios-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 3. LAZER, ESPORTE E RECREAÇÃO INFANTIL -->
+            <div class="section-title">3️⃣ LAZER, ESPORTE E RECREAÇÃO INFANTIL</div>
+
+            <div class="rider-section">
+                <h4>Playground (Parquinho)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-playground-sim" data-onchange="toggleCampos('praca-playground')"><label for="praca-playground-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-playground-nao" data-onchange="toggleCampos('praca-playground')"><label for="praca-playground-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-playground-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade de Brinquedos</div><input type="number" class="rider-input" id="praca-playground-qtd" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="praca-playground-mat" placeholder="Ex: Madeira/Plástico/Ferro" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="praca-playground-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-playground-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Academia ao Ar Livre</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-academia-sim" data-onchange="toggleCampos('praca-academia')"><label for="praca-academia-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-academia-nao" data-onchange="toggleCampos('praca-academia')"><label for="praca-academia-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-academia-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade de Aparelhos</div><input type="number" class="rider-input" id="praca-academia-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo de Aparelhos</div><input type="text" class="rider-input" id="praca-academia-tipo" placeholder="Ex: Para terceira idade" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="praca-academia-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-academia-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Quadra Poliesportiva</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-quadra-sim" data-onchange="toggleCampos('praca-quadra')"><label for="praca-quadra-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-quadra-nao" data-onchange="toggleCampos('praca-quadra')"><label for="praca-quadra-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-quadra-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="praca-quadra-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo de Piso</div><input type="text" class="rider-input" id="praca-quadra-piso" placeholder="Ex: Cimento/Areia/Grama sintética" disabled></div>
+                        <div><div class="rider-label">Fechada?</div><select class="rider-input" id="praca-quadra-fechada" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-quadra-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Pista de Caminhada</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-pista-sim" data-onchange="toggleCampos('praca-pista')"><label for="praca-pista-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-pista-nao" data-onchange="toggleCampos('praca-pista')"><label for="praca-pista-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-pista-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Extensão (metros)</div><input type="number" class="rider-input" id="praca-pista-ext" disabled></div>
+                        <div><div class="rider-label">Demarcada?</div><select class="rider-input" id="praca-pista-demarcada" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Tipo de Piso</div><input type="text" class="rider-input" id="praca-pista-piso" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-pista-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Pet Place (Parcão)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-petplace-sim" data-onchange="toggleCampos('praca-petplace')"><label for="praca-petplace-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-petplace-nao" data-onchange="toggleCampos('praca-petplace')"><label for="praca-petplace-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-petplace-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Área (m²)</div><input type="number" class="rider-input" id="praca-petplace-area" disabled></div>
+                        <div><div class="rider-label">Cercado?</div><select class="rider-input" id="praca-petplace-cercado" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Brinquedos de Agility?</div><select class="rider-input" id="praca-petplace-agility" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-petplace-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 4. ILUMINAÇÃO, UTILIDADES E SERVIÇOS PÚBLICOS -->
+            <div class="section-title">4️⃣ ILUMINAÇÃO, UTILIDADES E SERVIÇOS PÚBLICOS</div>
+
+            <div class="rider-section">
+                <h4>Iluminação Pública</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-iluminacao-sim" data-onchange="toggleCampos('praca-iluminacao')"><label for="praca-iluminacao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-iluminacao-nao" data-onchange="toggleCampos('praca-iluminacao')"><label for="praca-iluminacao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-iluminacao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo de Lâmpada</div><input type="text" class="rider-input" id="praca-iluminacao-tipo" placeholder="Ex: LED/Vapor de Sódio" disabled></div>
+                        <div><div class="rider-label">Quantidade de Postes</div><input type="number" class="rider-input" id="praca-iluminacao-postes" disabled></div>
+                        <div><div class="rider-label">Segurança Noturna?</div><select class="rider-input" id="praca-iluminacao-seguranca" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-iluminacao-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Internet / Wi-Fi Público</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-wifi-sim" data-onchange="toggleCampos('praca-wifi')"><label for="praca-wifi-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-wifi-nao" data-onchange="toggleCampos('praca-wifi')"><label for="praca-wifi-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-wifi-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Gratuito?</div><select class="rider-input" id="praca-wifi-gratuito" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Velocidade (Mbps)</div><input type="number" class="rider-input" id="praca-wifi-vel" disabled></div>
+                        <div><div class="rider-label">Nome da Rede (SSID)</div><input type="text" class="rider-input" id="praca-wifi-ssid" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-wifi-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Pontos de Energia</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-energia-sim" data-onchange="toggleCampos('praca-energia')"><label for="praca-energia-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-energia-nao" data-onchange="toggleCampos('praca-energia')"><label for="praca-energia-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-energia-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade de Tomadas</div><input type="number" class="rider-input" id="praca-energia-qtd" disabled></div>
+                        <div><div class="rider-label">Tensão</div><input type="text" class="rider-input" id="praca-energia-tensao" placeholder="Ex: 110V/220V" disabled></div>
+                        <div><div class="rider-label">Locais (Ex: Próximo ao coreto)</div><input type="text" class="rider-input" id="praca-energia-locais" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-energia-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sanitários Públicos</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-sanitarios-sim" data-onchange="toggleCampos('praca-sanitarios')"><label for="praca-sanitarios-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-sanitarios-nao" data-onchange="toggleCampos('praca-sanitarios')"><label for="praca-sanitarios-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-sanitarios-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="praca-sanitarios-qtd" disabled></div>
+                        <div><div class="rider-label">Aberto à População?</div><select class="rider-input" id="praca-sanitarios-aberto" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Com Vigilante?</div><select class="rider-input" id="praca-sanitarios-vigilante" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-sanitarios-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Bebedouros Públicos</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-bebedouros-sim" data-onchange="toggleCampos('praca-bebedouros')"><label for="praca-bebedouros-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-bebedouros-nao" data-onchange="toggleCampos('praca-bebedouros')"><label for="praca-bebedouros-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-bebedouros-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="praca-bebedouros-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="praca-bebedouros-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="praca-bebedouros-tipo" placeholder="Ex: Água gelada/natural" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-bebedouros-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 5. INFRAESTRUTURA VERDE E PAISAGISMO -->
+            <div class="section-title">5️⃣ INFRAESTRUTURA VERDE E PAISAGISMO</div>
+
+            <div class="rider-section">
+                <h4>Árvores de Grande Porte</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-arvores-sim" data-onchange="toggleCampos('praca-arvores')"><label for="praca-arvores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-arvores-nao" data-onchange="toggleCampos('praca-arvores')"><label for="praca-arvores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-arvores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="praca-arvores-qtd" disabled></div>
+                        <div><div class="rider-label">Espécies Principais</div><input type="text" class="rider-input" id="praca-arvores-especies" disabled></div>
+                        <div><div class="rider-label">Condição Geral</div><select class="rider-input" id="praca-arvores-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-arvores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Gramados e Canteiros</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-gramados-sim" data-onchange="toggleCampos('praca-gramados')"><label for="praca-gramados-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-gramados-nao" data-onchange="toggleCampos('praca-gramados')"><label for="praca-gramados-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-gramados-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Área Total (m²)</div><input type="number" class="rider-input" id="praca-gramados-area" disabled></div>
+                        <div><div class="rider-label">Frequência de Poda</div><input type="text" class="rider-input" id="praca-gramados-poda" placeholder="Ex: Semanal/Mensal" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="praca-gramados-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-gramados-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Fonte ou Chafariz</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-fonte-sim" data-onchange="toggleCampos('praca-fonte')"><label for="praca-fonte-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-fonte-nao" data-onchange="toggleCampos('praca-fonte')"><label for="praca-fonte-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-fonte-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="praca-fonte-tipo" placeholder="Ex: Espelho d'água/Luminosa/Chafariz" disabled></div>
+                        <div><div class="rider-label">Ativa?</div><select class="rider-input" id="praca-fonte-ativa" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Sistema de Filtragem?</div><select class="rider-input" id="praca-fonte-filtro" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-fonte-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 6. ACESSIBILIDADE ARQUITETÔNICA URBANA -->
+            <div class="section-title">6️⃣ ACESSIBILIDADE ARQUITETÔNICA URBANA</div>
+
+            <div class="rider-section">
+                <h4>Rampas de Calçada</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-rampas-sim" data-onchange="toggleCampos('praca-rampas')"><label for="praca-rampas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-rampas-nao" data-onchange="toggleCampos('praca-rampas')"><label for="praca-rampas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-rampas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Rebaixamento de Calçada?</div><select class="rider-input" id="praca-rampas-rebaixamento" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Quantidade de Pontos</div><input type="number" class="rider-input" id="praca-rampas-qtd" disabled></div>
+                        <div><div class="rider-label">Normas de Acessibilidade?</div><select class="rider-input" id="praca-rampas-normas" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-rampas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Piso Podotátil</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-piso-tatil-sim" data-onchange="toggleCampos('praca-piso-tatil')"><label for="praca-piso-tatil-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-piso-tatil-nao" data-onchange="toggleCampos('praca-piso-tatil')"><label for="praca-piso-tatil-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-piso-tatil-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Extensão (metros)</div><input type="number" class="rider-input" id="praca-piso-tatil-ext" disabled></div>
+                        <div><div class="rider-label">Caminhos Direcionais?</div><select class="rider-input" id="praca-piso-tatil-direcionais" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="praca-piso-tatil-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-piso-tatil-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Acesso a Estruturas (Coreto, Banheiros, Quadras)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="praca-acesso-estruturas-sim" data-onchange="toggleCampos('praca-acesso-estruturas')"><label for="praca-acesso-estruturas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="praca-acesso-estruturas-nao" data-onchange="toggleCampos('praca-acesso-estruturas')"><label for="praca-acesso-estruturas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="praca-acesso-estruturas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Coreto Acessível?</div><select class="rider-input" id="praca-acesso-coreto" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Banheiros Acessíveis?</div><select class="rider-input" id="praca-acesso-banheiros" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Quadras Acessíveis?</div><select class="rider-input" id="praca-acesso-quadras" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="praca-acesso-estruturas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 7. INFORMAÇÕES COMPLEMENTARES -->
+            <div class="section-title">7️⃣ INFORMAÇÕES COMPLEMENTARES</div>
+            <div class="form-group"><label>Descrição Geral da Praça</label><textarea id="praca-desc-geral" placeholder="Histórico, restrições legais, tombamentos, observações de zeladoria, etc."></textarea></div>
+
+            <button class="btn btn-success" data-onclick="saveForm('praca')">✓ SALVAR PRAÇA</button>
+        </div>
+    </div>
+
+    <div id="biblioteca" class="content">
+        <button class="btn" style="background: #999; color: white; margin-bottom: 15px;" data-onclick="showTab('menu')">← Voltar</button>
+        <div class="equipamento-card">
+            <h3>📚 INVENTÁRIO TÉCNICO - BIBLIOTECA</h3>
+            
+            <div class="section-title">📌 IDENTIFICAÇÃO</div>
+            <div class="form-group"><label>Nome da Biblioteca</label><input type="text" id="biblioteca-nome" placeholder="Nome"></div>
+            <div class="form-group"><label>Endereço Completo</label><textarea id="biblioteca-endereco" placeholder="Endereço"></textarea></div>
+            <div class="form-group"><label>Telefone</label><input type="text" id="biblioteca-telefone" placeholder="(00) 0000-0000"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="biblioteca-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Responsável</label><input type="text" id="biblioteca-responsavel"></div>
+            <div class="form-group"><label>Capacidade (pessoas)</label><input type="number" id="biblioteca-capacidade"></div>
+            <div class="form-group"><label>Quantidade do Acervo (títulos)</label><input type="number" id="biblioteca-acervo-qtd" placeholder="Quantidade total de livros/títulos"></div>
+            <div class="form-group"><label>Observações da Identificação</label><textarea id="biblioteca-id-obs" placeholder="Informações adicionais"></textarea></div>
+
+            <!-- Adicionar Fotos - BIBLIOTECA -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="biblioteca-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="biblioteca-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="biblioteca-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('biblioteca')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos - BIBLIOTECA -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="biblioteca-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="biblioteca-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="biblioteca-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('biblioteca')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- 1. SISTEMAS DE TECNOLOGIA, PESQUISA E CONSULTA -->
+            <div class="section-title">1️⃣ SISTEMAS DE TECNOLOGIA, PESQUISA E CONSULTA</div>
+
+            <div class="rider-section">
+                <h4>Terminais de Consulta</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-terminais-sim" data-onchange="toggleCampos('bib-terminais')"><label for="bib-terminais-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-terminais-nao" data-onchange="toggleCampos('bib-terminais')"><label for="bib-terminais-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-terminais-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-terminais-qtd" disabled></div>
+                        <div><div class="rider-label">Software</div><input type="text" class="rider-input" id="bib-terminais-soft" placeholder="Ex: Sophia/Pergamum/Koha" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-terminais-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-terminais-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Computadores de Estudo</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-pc-estudo-sim" data-onchange="toggleCampos('bib-pc-estudo')"><label for="bib-pc-estudo-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-pc-estudo-nao" data-onchange="toggleCampos('bib-pc-estudo')"><label for="bib-pc-estudo-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-pc-estudo-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-pc-estudo-qtd" disabled></div>
+                        <div><div class="rider-label">Com Internet Liberada?</div><select class="rider-input" id="bib-pc-estudo-internet" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Locação</div><input type="text" class="rider-input" id="bib-pc-estudo-local" placeholder="Ex: Bancadas de estudo" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-pc-estudo-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Internet de Alta Velocidade e Wi-Fi</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-internet-sim" data-onchange="toggleCampos('bib-internet')"><label for="bib-internet-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-internet-nao" data-onchange="toggleCampos('bib-internet')"><label for="bib-internet-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-internet-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Velocidade Contratada (Mbps)</div><input type="number" class="rider-input" id="bib-internet-vel" disabled></div>
+                        <div><div class="rider-label">Wi-Fi Liberado?</div><select class="rider-input" id="bib-internet-wifi" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Cobertura Completa?</div><select class="rider-input" id="bib-internet-cobertura" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-internet-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Leitores de Código de Barras</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-scanners-sim" data-onchange="toggleCampos('bib-scanners')"><label for="bib-scanners-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-scanners-nao" data-onchange="toggleCampos('bib-scanners')"><label for="bib-scanners-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-scanners-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-scanners-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="bib-scanners-tipo" placeholder="Ex: Scanner de mão" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-scanners-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-scanners-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Terminais de Autoatendimento</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-autoatend-sim" data-onchange="toggleCampos('bib-autoatend')"><label for="bib-autoatend-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-autoatend-nao" data-onchange="toggleCampos('bib-autoatend')"><label for="bib-autoatend-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-autoatend-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-autoatend-qtd" disabled></div>
+                        <div><div class="rider-label">Tecnologia</div><input type="text" class="rider-input" id="bib-autoatend-tech" placeholder="Ex: RFID/Código de Barras" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-autoatend-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-autoatend-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Impressoras / Copiadoras / Scanners</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-impressoras-sim" data-onchange="toggleCampos('bib-impressoras')"><label for="bib-impressoras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-impressoras-nao" data-onchange="toggleCampos('bib-impressoras')"><label for="bib-impressoras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-impressoras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-impressoras-qtd" disabled></div>
+                        <div><div class="rider-label">Com Cobrança?</div><select class="rider-input" id="bib-impressoras-cobranca" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-impressoras-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-impressoras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 2. MOBILIÁRIO, ARMAZENAMENTO E EXPOSIÇÃO -->
+            <div class="section-title">2️⃣ MOBILIÁRIO, ARMAZENAMENTO E EXPOSIÇÃO</div>
+
+            <div class="rider-section">
+                <h4>Estantes Duplas (Face Dupla)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-estantes-duplas-sim" data-onchange="toggleCampos('bib-estantes-duplas')"><label for="bib-estantes-duplas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-estantes-duplas-nao" data-onchange="toggleCampos('bib-estantes-duplas')"><label for="bib-estantes-duplas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-estantes-duplas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-estantes-duplas-qtd" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="bib-estantes-duplas-mat" placeholder="Ex: Aço/Madeira" disabled></div>
+                        <div><div class="rider-label">Dimensões (L x C x A)</div><input type="text" class="rider-input" id="bib-estantes-duplas-dim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-estantes-duplas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Estantes Simples (Face Única)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-estantes-simples-sim" data-onchange="toggleCampos('bib-estantes-simples')"><label for="bib-estantes-simples-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-estantes-simples-nao" data-onchange="toggleCampos('bib-estantes-simples')"><label for="bib-estantes-simples-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-estantes-simples-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-estantes-simples-qtd" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="bib-estantes-simples-mat" placeholder="Ex: Aço/Madeira" disabled></div>
+                        <div><div class="rider-label">Dimensões (L x C x A)</div><input type="text" class="rider-input" id="bib-estantes-simples-dim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-estantes-simples-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Expositores de Periódicos</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-expositores-sim" data-onchange="toggleCampos('bib-expositores')"><label for="bib-expositores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-expositores-nao" data-onchange="toggleCampos('bib-expositores')"><label for="bib-expositores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-expositores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-expositores-qtd" disabled></div>
+                        <div><div class="rider-label">Divisórias/Nichos por Expositor</div><input type="number" class="rider-input" id="bib-expositores-nichos" disabled></div>
+                        <div><div class="rider-label">Dimensões (L x C x A)</div><input type="text" class="rider-input" id="bib-expositores-dim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-expositores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Bancadas de Estudo Coletivo</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-bancadas-sim" data-onchange="toggleCampos('bib-bancadas')"><label for="bib-bancadas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-bancadas-nao" data-onchange="toggleCampos('bib-bancadas')"><label for="bib-bancadas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-bancadas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-bancadas-qtd" disabled></div>
+                        <div><div class="rider-label">Tomadas Embutidas?</div><select class="rider-input" id="bib-bancadas-tomadas" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Dimensões (L x C x A)</div><input type="text" class="rider-input" id="bib-bancadas-dim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-bancadas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Cabines de Estudo Individual</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-cabines-sim" data-onchange="toggleCampos('bib-cabines')"><label for="bib-cabines-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-cabines-nao" data-onchange="toggleCampos('bib-cabines')"><label for="bib-cabines-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-cabines-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-cabines-qtd" disabled></div>
+                        <div><div class="rider-label">Luminária Individual?</div><select class="rider-input" id="bib-cabines-lamp" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Dimensões (L x C x A)</div><input type="text" class="rider-input" id="bib-cabines-dim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-cabines-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Cadeiras dos Usuários</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-cadeiras-sim" data-onchange="toggleCampos('bib-cadeiras')"><label for="bib-cadeiras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-cadeiras-nao" data-onchange="toggleCampos('bib-cadeiras')"><label for="bib-cadeiras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-cadeiras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-cadeiras-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="bib-cadeiras-tipo" placeholder="Ex: Fixas/Removíveis" disabled></div>
+                        <div><div class="rider-label">Material/Ergonomia</div><input type="text" class="rider-input" id="bib-cadeiras-mat" placeholder="Ex: Estofada/Plástico" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-cadeiras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 3. INFRAESTRUTURA AMBIENTAL, CONSERVAÇÃO E SEGURANÇA -->
+            <div class="section-title">3️⃣ INFRAESTRUTURA AMBIENTAL, CONSERVAÇÃO E SEGURANÇA</div>
+
+            <div class="rider-section">
+                <h4>Ar-Condicionado</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-ac-sim" data-onchange="toggleCampos('bib-ac')"><label for="bib-ac-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-ac-nao" data-onchange="toggleCampos('bib-ac')"><label for="bib-ac-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-ac-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="bib-ac-tipo" disabled></div>
+                        <div><div class="rider-label">Capacidade (BTUs)</div><input type="number" class="rider-input" id="bib-ac-btu" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-ac-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-ac-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Desumidificadores de Ar</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-desumidificadores-sim" data-onchange="toggleCampos('bib-desumidificadores')"><label for="bib-desumidificadores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-desumidificadores-nao" data-onchange="toggleCampos('bib-desumidificadores')"><label for="bib-desumidificadores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-desumidificadores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-desumidificadores-qtd" disabled></div>
+                        <div><div class="rider-label">Locação</div><input type="text" class="rider-input" id="bib-desumidificadores-local" placeholder="Ex: Salas de acervo raro" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-desumidificadores-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-desumidificadores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sensores de Umidade e Temperatura</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-sensores-sim" data-onchange="toggleCampos('bib-sensores')"><label for="bib-sensores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-sensores-nao" data-onchange="toggleCampos('bib-sensores')"><label for="bib-sensores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-sensores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-sensores-qtd" disabled></div>
+                        <div><div class="rider-label">Monitoramento</div><input type="text" class="rider-input" id="bib-sensores-monit" placeholder="Ex: Contínuo/Manual" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-sensores-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-sensores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Antenas de Segurança (Pórtico Antifurto)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-portico-sim" data-onchange="toggleCampos('bib-portico')"><label for="bib-portico-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-portico-nao" data-onchange="toggleCampos('bib-portico')"><label for="bib-portico-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-portico-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Sistema</div><input type="text" class="rider-input" id="bib-portico-sistema" placeholder="Ex: Eletromagnético/RFID" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-portico-qtd" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-portico-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-portico-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Circuito de CFTV (Câmeras de Vigilância)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-cftv-sim" data-onchange="toggleCampos('bib-cftv')"><label for="bib-cftv-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-cftv-nao" data-onchange="toggleCampos('bib-cftv')"><label for="bib-cftv-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-cftv-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-cftv-qtd" disabled></div>
+                        <div><div class="rider-label">Locais Cobertos</div><input type="text" class="rider-input" id="bib-cftv-locais" placeholder="Ex: Corredores, balcão, saídas" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-cftv-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-cftv-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sistema de Combate a Incêndio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-incendio-sim" data-onchange="toggleCampos('bib-incendio')"><label for="bib-incendio-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-incendio-nao" data-onchange="toggleCampos('bib-incendio')"><label for="bib-incendio-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-incendio-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="bib-incendio-tipo" placeholder="Ex: CO2/Pó/FM-200" disabled></div>
+                        <div><div class="rider-label">Sensores de Fumaça?</div><select class="rider-input" id="bib-incendio-sensores" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Extintores Adequados?</div><select class="rider-input" id="bib-incendio-extintores" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-incendio-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 4. ESPAÇOS CULTURAIS, REUNIÕES E EVENTOS -->
+            <div class="section-title">4️⃣ ESPAÇOS CULTURAIS, REUNIÕES E EVENTOS</div>
+
+            <div class="rider-section">
+                <h4>Salas de Estudo em Grupo</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-salas-grupo-sim" data-onchange="toggleCampos('bib-salas-grupo')"><label for="bib-salas-grupo-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-salas-grupo-nao" data-onchange="toggleCampos('bib-salas-grupo')"><label for="bib-salas-grupo-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-salas-grupo-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-salas-grupo-qtd" disabled></div>
+                        <div><div class="rider-label">Lousa Branca?</div><select class="rider-input" id="bib-salas-grupo-lousa" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Capacidade Média</div><input type="number" class="rider-input" id="bib-salas-grupo-cap" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-salas-grupo-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Espaço Infantil / Gibiteca</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-infantil-sim" data-onchange="toggleCampos('bib-infantil')"><label for="bib-infantil-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-infantil-nao" data-onchange="toggleCampos('bib-infantil')"><label for="bib-infantil-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-infantil-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Área (m²)</div><input type="number" class="rider-input" id="bib-infantil-area" disabled></div>
+                        <div><div class="rider-label">Mobiliário Adaptado?</div><select class="rider-input" id="bib-infantil-mobiliario" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Condição Geral</div><input type="text" class="rider-input" id="bib-infantil-cond" placeholder="Ex: Bom/Regular/Ruim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-infantil-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Tribuna de Contação de Histórias</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-tribuna-sim" data-onchange="toggleCampos('bib-tribuna')"><label for="bib-tribuna-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-tribuna-nao" data-onchange="toggleCampos('bib-tribuna')"><label for="bib-tribuna-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-tribuna-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Altura (m)</div><input type="number" class="rider-input" id="bib-tribuna-altura" disabled></div>
+                        <div><div class="rider-label">Dimensões (L x C)</div><input type="text" class="rider-input" id="bib-tribuna-dim" disabled></div>
+                        <div><div class="rider-label">Iluminação?</div><select class="rider-input" id="bib-tribuna-ilum" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-tribuna-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Hall de Entrada / Recepção</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-hall-sim" data-onchange="toggleCampos('bib-hall')"><label for="bib-hall-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-hall-nao" data-onchange="toggleCampos('bib-hall')"><label for="bib-hall-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-hall-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Área (m²)</div><input type="number" class="rider-input" id="bib-hall-area" disabled></div>
+                        <div><div class="rider-label">Capacidade (pessoas)</div><input type="number" class="rider-input" id="bib-hall-cap" disabled></div>
+                        <div><div class="rider-label">Climatizado?</div><select class="rider-input" id="bib-hall-ac" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-hall-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 5. LOGÍSTICA DE ALIMENTAÇÃO E DEBATES -->
+            <div class="section-title">5️⃣ LOGÍSTICA DE ALIMENTAÇÃO E DEBATES</div>
+
+            <div class="rider-section">
+                <h4>Mesas para Café / Lançamento</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-mesas-cafe-sim" data-onchange="toggleCampos('bib-mesas-cafe')"><label for="bib-mesas-cafe-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-mesas-cafe-nao" data-onchange="toggleCampos('bib-mesas-cafe')"><label for="bib-mesas-cafe-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-mesas-cafe-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-mesas-cafe-qtd" disabled></div>
+                        <div><div class="rider-label">Dimensões</div><input type="text" class="rider-input" id="bib-mesas-cafe-dim" placeholder="Ex: Diâmetro ou L x C" disabled></div>
+                        <div><div class="rider-label">Locação</div><input type="text" class="rider-input" id="bib-mesas-cafe-local" placeholder="Ex: Hall (proibido acervo)" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-mesas-cafe-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Toalhas de Mesa</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-toalhas-sim" data-onchange="toggleCampos('bib-toalhas')"><label for="bib-toalhas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-toalhas-nao" data-onchange="toggleCampos('bib-toalhas')"><label for="bib-toalhas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-toalhas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-toalhas-qtd" disabled></div>
+                        <div><div class="rider-label">Cores Disponíveis</div><input type="text" class="rider-input" id="bib-toalhas-cores" disabled></div>
+                        <div><div class="rider-label">Condição</div><input type="text" class="rider-input" id="bib-toalhas-cond" placeholder="Ex: Bom/Regular/Ruim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-toalhas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Carrinhos de Livros</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-carrinhos-sim" data-onchange="toggleCampos('bib-carrinhos')"><label for="bib-carrinhos-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-carrinhos-nao" data-onchange="toggleCampos('bib-carrinhos')"><label for="bib-carrinhos-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-carrinhos-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-carrinhos-qtd" disabled></div>
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="bib-carrinhos-mat" placeholder="Ex: Aço/Madeira" disabled></div>
+                        <div><div class="rider-label">Condição</div><input type="text" class="rider-input" id="bib-carrinhos-cond" placeholder="Ex: Bom/Regular/Ruim" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-carrinhos-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 6. ACESSIBILIDADE ARQUITETÔNICA E INFORMACIONAL -->
+            <div class="section-title">6️⃣ ACESSIBILIDADE ARQUITETÔNICA E INFORMACIONAL</div>
+
+            <div class="rider-section">
+                <h4>Rotas Acessíveis</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-rotas-sim" data-onchange="toggleCampos('bib-rotas')"><label for="bib-rotas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-rotas-nao" data-onchange="toggleCampos('bib-rotas')"><label for="bib-rotas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-rotas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Rampas?</div><select class="rider-input" id="bib-rotas-rampas" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Piso Tátil?</div><select class="rider-input" id="bib-rotas-tatil" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Elevador?</div><select class="rider-input" id="bib-rotas-elevador" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Locais (Entrada, corredores, banheiros)</div><textarea class="rider-input" id="bib-rotas-locais" disabled></textarea></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-rotas-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Mesas Acessíveis (PNE)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-mesas-pne-sim" data-onchange="toggleCampos('bib-mesas-pne')"><label for="bib-mesas-pne-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-mesas-pne-nao" data-onchange="toggleCampos('bib-mesas-pne')"><label for="bib-mesas-pne-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-mesas-pne-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-mesas-pne-qtd" disabled></div>
+                        <div><div class="rider-label">Altura (cm)</div><input type="number" class="rider-input" id="bib-mesas-pne-altura" disabled></div>
+                        <div><div class="rider-label">Para Cadeirantes?</div><select class="rider-input" id="bib-mesas-pne-cadeirante" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-mesas-pne-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Sanitários Adaptados</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-sanitarios-sim" data-onchange="toggleCampos('bib-sanitarios')"><label for="bib-sanitarios-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-sanitarios-nao" data-onchange="toggleCampos('bib-sanitarios')"><label for="bib-sanitarios-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-sanitarios-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Masculino?</div><select class="rider-input" id="bib-sanitarios-masc" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Feminino?</div><select class="rider-input" id="bib-sanitarios-fem" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Unissex?</div><select class="rider-input" id="bib-sanitarios-uni" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Próximo à Biblioteca?</div><select class="rider-input" id="bib-sanitarios-proximo" disabled><option>Sim</option><option>Não</option></select></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-sanitarios-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Acervo Acessível (Braille / Audiolivros)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-acervo-acessivel-sim" data-onchange="toggleCampos('bib-acervo-acessivel')"><label for="bib-acervo-acessivel-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-acervo-acessivel-nao" data-onchange="toggleCampos('bib-acervo-acessivel')"><label for="bib-acervo-acessivel-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-acervo-acessivel-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Livros em Braille?</div><select class="rider-input" id="bib-acervo-braille" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Audiolivros?</div><select class="rider-input" id="bib-acervo-audio" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Espaço Reservado?</div><select class="rider-input" id="bib-acervo-espaco" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-acervo-acessivel-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Computador Adaptado (Tecnologia Assistiva)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-pc-assistiva-sim" data-onchange="toggleCampos('bib-pc-assistiva')"><label for="bib-pc-assistiva-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-pc-assistiva-nao" data-onchange="toggleCampos('bib-pc-assistiva')"><label for="bib-pc-assistiva-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-pc-assistiva-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Software Leitura Tela?</div><input type="text" class="rider-input" id="bib-pc-assistiva-soft" placeholder="Ex: NVDA/JAWS" disabled></div>
+                        <div><div class="rider-label">Teclado Adaptado?</div><select class="rider-input" id="bib-pc-assistiva-teclado" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="bib-pc-assistiva-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-pc-assistiva-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 7. INFORMAÇÕES COMPLEMENTARES -->
+            <div class="section-title">7️⃣ INFORMAÇÕES COMPLEMENTARES</div>
+            <div class="form-group"><label>Descrição Geral da Biblioteca</label><textarea id="biblioteca-desc-geral" placeholder="Política de desenvolvimento de coleções, restrições de uso, regras internas, etc."></textarea></div>
+
+            <!-- SEGURANÇA E DOCUMENTAÇÃO LEGAL - NOVO -->
+            <div class="section-title">🔒 SEGURANÇA E DOCUMENTAÇÃO LEGAL</div>
+
+            <div class="rider-section">
+                <h4>AVCB (Alvará de Corpo de Bombeiros)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-seg-avcb-sim" data-onchange="toggleCampos('bib-seg-avcb')"><label for="bib-seg-avcb-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-seg-avcb-nao" data-onchange="toggleCampos('bib-seg-avcb')"><label for="bib-seg-avcb-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-seg-avcb-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Válido?</div><select class="rider-input" id="bib-seg-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="bib-seg-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="bib-seg-avcb-numero" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-seg-avcb-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Extintores de Incêndio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-seg-extintores-sim" data-onchange="toggleCampos('bib-seg-extintores')"><label for="bib-seg-extintores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-seg-extintores-nao" data-onchange="toggleCampos('bib-seg-extintores')"><label for="bib-seg-extintores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-seg-extintores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="bib-seg-extintores-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo (ABC/CO2)</div><input type="text" class="rider-input" id="bib-seg-extintores-tipo" disabled></div>
+                        <div><div class="rider-label">Vencido?</div><select class="rider-input" id="bib-seg-extintores-vencido" disabled><option>Não</option><option>Sim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-seg-extintores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Rotas de Fuga e Sinalização</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-seg-rotas-fuga-sim" data-onchange="toggleCampos('bib-seg-rotas-fuga')"><label for="bib-seg-rotas-fuga-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-seg-rotas-fuga-nao" data-onchange="toggleCampos('bib-seg-rotas-fuga')"><label for="bib-seg-rotas-fuga-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-seg-rotas-fuga-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Saídas de Emergência</div><input type="number" class="rider-input" id="bib-seg-rotas-fuga-saidas" disabled></div>
+                        <div><div class="rider-label">Sinalização Luminosa?</div><select class="rider-input" id="bib-seg-rotas-fuga-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Desobstruída?</div><select class="rider-input" id="bib-seg-rotas-fuga-desobstruida" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-seg-rotas-fuga-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Alvarás e Licenças</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="bib-seg-alvaras-sim" data-onchange="toggleCampos('bib-seg-alvaras')"><label for="bib-seg-alvaras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="bib-seg-alvaras-nao" data-onchange="toggleCampos('bib-seg-alvaras')"><label for="bib-seg-alvaras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="bib-seg-alvaras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Funcionamento Válido?</div><select class="rider-input" id="bib-seg-alvaras-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Sanitário Válido?</div><select class="rider-input" id="bib-seg-alvaras-sanitario" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Outros?</div><input type="text" class="rider-input" id="bib-seg-alvaras-outros" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-seg-alvaras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <button class="btn btn-success" data-onclick="saveForm('biblioteca')">✓ SALVAR BIBLIOTECA</button>
+        </div>
+    </div>
+
+    <div id="ginasio" class="content">
+        <button class="btn" style="background: #999; color: white; margin-bottom: 15px;" data-onclick="showTab('menu')">← Voltar</button>
+        <div class="equipamento-card">
+            <h3>🏀 AVALIAÇÃO DE VIABILIDADE - GINÁSIO PARA EVENTOS CULTURAIS</h3>
+            
+            <div class="section-title">📌 IDENTIFICAÇÃO</div>
+            <div class="form-group"><label>Nome do Ginásio</label><input type="text" id="ginasio-nome" placeholder="Nome"></div>
+            <div class="form-group"><label>Endereço Completo</label><textarea id="ginasio-endereco" placeholder="Endereço completo"></textarea></div>
+            <div class="form-group"><label>Telefone</label><input type="text" id="ginasio-telefone" placeholder="(00) 0000-0000"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="ginasio-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Responsável</label><input type="text" id="ginasio-responsavel"></div>
+            <div class="form-group"><label>Capacidade Total (pessoas)</label><input type="number" id="ginasio-capacidade"></div>
+            <div class="form-group"><label>Observações da Identificação</label><textarea id="ginasio-id-obs" placeholder="Informações adicionais"></textarea></div>
+
+            <!-- Adicionar Fotos - GINÁSIO -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="ginasio-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="ginasio-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="ginasio-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('ginasio')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Documentos - GINÁSIO -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="ginasio-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="ginasio-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="ginasio-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('ginasio')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- 1. VIABILIDADE E PROTEÇÃO DA QUADRA -->
+            <div class="section-title">1️⃣ VIABILIDADE E PROTEÇÃO DA QUADRA</div>
+
+            <div class="rider-section">
+                <h4>Tipo de Piso da Quadra</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-piso-sim" data-onchange="toggleCampos('gin-piso')"><label for="gin-piso-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-piso-nao" data-onchange="toggleCampos('gin-piso')"><label for="gin-piso-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-piso-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="gin-piso-mat" placeholder="Ex: Madeira/Epóxi/Concreto" disabled></div>
+                        <div><div class="rider-label">Estado de Conservação</div><select class="rider-input" id="gin-piso-estado" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                        <div><div class="rider-label">Exige Proteção?</div><select class="rider-input" id="gin-piso-protecao-exigida" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-piso-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Proteção do Piso (Tapetes / Tablados)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-protecao-sim" data-onchange="toggleCampos('gin-protecao')"><label for="gin-protecao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-protecao-nao" data-onchange="toggleCampos('gin-protecao')"><label for="gin-protecao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-protecao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo de Proteção</div><input type="text" class="rider-input" id="gin-protecao-tipo" placeholder="Ex: Easyfloor/Linóleo/Carpete" disabled></div>
+                        <div><div class="rider-label">Quantidade Disponível (m²)</div><input type="number" class="rider-input" id="gin-protecao-area" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="gin-protecao-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-protecao-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Carga Máxima Suportada do Piso</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-carga-sim" data-onchange="toggleCampos('gin-carga')"><label for="gin-carga-sim">( ) Possui Informação</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-carga-nao" data-onchange="toggleCampos('gin-carga')"><label for="gin-carga-nao">( ) Não Possui Informação</label></div>
+                </div>
+                <div id="gin-carga-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Capacidade (kg/m²)</div><input type="number" class="rider-input" id="gin-carga-capacidade" disabled></div>
+                        <div><div class="rider-label">Suporta Palcos Pesados?</div><select class="rider-input" id="gin-carga-palcos" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Suporta Carrinhos/Empilhadeiras?</div><select class="rider-input" id="gin-carga-carrinhos" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-carga-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Dimensões Livres da Quadra</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-dimensoes-sim" data-onchange="toggleCampos('gin-dimensoes')"><label for="gin-dimensoes-sim">( ) Medidas Conhecidas</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-dimensoes-nao" data-onchange="toggleCampos('gin-dimensoes')"><label for="gin-dimensoes-nao">( ) Medidas Desconhecidas</label></div>
+                </div>
+                <div id="gin-dimensoes-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Largura (m)</div><input type="number" class="rider-input" id="gin-dimensoes-largura" step="0.5" disabled></div>
+                        <div><div class="rider-label">Comprimento (m)</div><input type="number" class="rider-input" id="gin-dimensoes-comprimento" step="0.5" disabled></div>
+                        <div><div class="rider-label">Altura Livre Teto (m)</div><input type="number" class="rider-input" id="gin-dimensoes-altura" step="0.5" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Área Útil (m²)</div><input type="number" class="rider-input" id="gin-dimensoes-area" disabled></div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-dimensoes-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Fixações no Piso (Furos / Parafusos)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-fixacoes-permitido" data-onchange="toggleCampos('gin-fixacoes')"><label for="gin-fixacoes-permitido">( ) Permitido</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-fixacoes-proibido" data-onchange="toggleCampos('gin-fixacoes')"><label for="gin-fixacoes-proibido">( ) Proibido</label></div>
+                </div>
+                <div id="gin-fixacoes-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Motivo (se proibido)</div><input type="text" class="rider-input" id="gin-fixacoes-motivo" placeholder="Ex: Proteger marcações" disabled></div>
+                        <div><div class="rider-label">Alternativa Disponível?</div><select class="rider-input" id="gin-fixacoes-alternativa" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-fixacoes-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 2. ARQUITETURA DO GINÁSIO, COBERTA E ARQUIBANCADA -->
+            <div class="section-title">2️⃣ ARQUITETURA DO GINÁSIO, COBERTA E ARQUIBANCADA</div>
+
+            <div class="rider-section">
+                <h4>Fechamento do Ginásio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-fechamento-total" data-onchange="toggleCampos('gin-fechamento')"><label for="gin-fechamento-total">( ) Totalmente Fechado</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-fechamento-parcial" data-onchange="toggleCampos('gin-fechamento')"><label for="gin-fechamento-parcial">( ) Parcialmente Aberto</label></div>
+                </div>
+                <div id="gin-fechamento-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo de Abertura (se houver)</div><input type="text" class="rider-input" id="gin-fechamento-tipo" placeholder="Ex: Laterais/Lanternins" disabled></div>
+                        <div><div class="rider-label">Afeta Clima Interno?</div><select class="rider-input" id="gin-fechamento-clima" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-fechamento-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Arquibancada Disponível</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-arquibancada-sim" data-onchange="toggleCampos('gin-arquibancada')"><label for="gin-arquibancada-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-arquibancada-nao" data-onchange="toggleCampos('gin-arquibancada')"><label for="gin-arquibancada-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-arquibancada-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Material</div><input type="text" class="rider-input" id="gin-arquibancada-mat" placeholder="Ex: Concreto/Madeira/Plástico fixo" disabled></div>
+                        <div><div class="rider-label">Fixas?</div><select class="rider-input" id="gin-arquibancada-fixas" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="gin-arquibancada-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-arquibancada-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Capacidade da Arquibancada</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-cap-arquibancada-sim" data-onchange="toggleCampos('gin-cap-arquibancada')"><label for="gin-cap-arquibancada-sim">( ) Possui Informação</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-cap-arquibancada-nao" data-onchange="toggleCampos('gin-cap-arquibancada')"><label for="gin-cap-arquibancada-nao">( ) Não Possui Informação</label></div>
+                </div>
+                <div id="gin-cap-arquibancada-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Lotação Máxima (pessoas)</div><input type="number" class="rider-input" id="gin-cap-arquibancada-lotacao" disabled></div>
+                        <div><div class="rider-label">Validado por AVCB?</div><select class="rider-input" id="gin-cap-arquibancada-avcb" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-cap-arquibancada-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 3. CLIMATIZAÇÃO, VENTILAÇÃO E ACÚSTICA -->
+            <div class="section-title">3️⃣ CLIMATIZAÇÃO, VENTILAÇÃO E ACÚSTICA</div>
+
+            <div class="rider-section">
+                <h4>Sistema de Climatização</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-climatizacao-sim" data-onchange="toggleCampos('gin-climatizacao')"><label for="gin-climatizacao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-climatizacao-nao" data-onchange="toggleCampos('gin-climatizacao')"><label for="gin-climatizacao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-climatizacao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="gin-climatizacao-tipo" placeholder="Ex: Ar-Condicionado/Ecobrisa" disabled></div>
+                        <div><div class="rider-label">Cobertura</div><input type="text" class="rider-input" id="gin-climatizacao-cobertura" placeholder="Ex: Total/Parcial" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="gin-climatizacao-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-climatizacao-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Nível de Ruído da Ventilação</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-ruido-silencioso" data-onchange="toggleCampos('gin-ruido')"><label for="gin-ruido-silencioso">( ) Silencioso</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-ruido-barulhento" data-onchange="toggleCampos('gin-ruido')"><label for="gin-ruido-barulhento">( ) Barulhento</label></div>
+                </div>
+                <div id="gin-ruido-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Nível (dB) se conhecido</div><input type="number" class="rider-input" id="gin-ruido-decibeis" disabled></div>
+                        <div><div class="rider-label">Afeta Palestras/Teatro?</div><select class="rider-input" id="gin-ruido-afeta" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-ruido-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Ventilação Natural (Janelas / Lanternins)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-vent-natural-sim" data-onchange="toggleCampos('gin-vent-natural')"><label for="gin-vent-natural-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-vent-natural-nao" data-onchange="toggleCampos('gin-vent-natural')"><label for="gin-vent-natural-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-vent-natural-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="gin-vent-natural-tipo" placeholder="Ex: Janelas/Venezianas/Lanternins" disabled></div>
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="gin-vent-natural-qtd" disabled></div>
+                        <div><div class="rider-label">Suficiente para Dias Quentes?</div><select class="rider-input" id="gin-vent-natural-suficiente" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-vent-natural-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Tratamento Acústico (Teto e Paredes)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-acustica-sim" data-onchange="toggleCampos('gin-acustica')"><label for="gin-acustica-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-acustica-nao" data-onchange="toggleCampos('gin-acustica')"><label for="gin-acustica-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-acustica-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo de Isolamento</div><input type="text" class="rider-input" id="gin-acustica-tipo" placeholder="Ex: Espuma/Placas/Revestimento" disabled></div>
+                        <div><div class="rider-label">Abrange Quanto?</div><input type="text" class="rider-input" id="gin-acustica-abrangencia" placeholder="Ex: Teto/Paredes/Teto+Paredes" disabled></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="gin-acustica-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-acustica-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 4. ENERGIA ELÉTRICA E ILUMINAÇÃO -->
+            <div class="section-title">4️⃣ ENERGIA ELÉTRICA E ILUMINAÇÃO (CAPACIDADE TÉCNICA)</div>
+
+            <div class="rider-section">
+                <h4>Energia Exclusiva para o Palco</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-energia-palco-sim" data-onchange="toggleCampos('gin-energia-palco')"><label for="gin-energia-palco-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-energia-palco-nao" data-onchange="toggleCampos('gin-energia-palco')"><label for="gin-energia-palco-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-energia-palco-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo (Monofásica/Trifásica)</div><input type="text" class="rider-input" id="gin-energia-palco-tipo" disabled></div>
+                        <div><div class="rider-label">Amperagem Disponível (A)</div><input type="number" class="rider-input" id="gin-energia-palco-amperagem" disabled></div>
+                        <div><div class="rider-label">Evita Sobrecarga de Refletores?</div><select class="rider-input" id="gin-energia-palco-sobrecarga" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-energia-palco-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Gerador de Energia</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-gerador-sim" data-onchange="toggleCampos('gin-gerador')"><label for="gin-gerador-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-gerador-nao" data-onchange="toggleCampos('gin-gerador')"><label for="gin-gerador-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-gerador-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Potência (kVA)</div><input type="number" class="rider-input" id="gin-gerador-potencia" disabled></div>
+                        <div><div class="rider-label">Funcionamento</div><select class="rider-input" id="gin-gerador-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Local para Instalar?</div><select class="rider-input" id="gin-gerador-local" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-gerador-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Iluminação Geral (Dimererizável)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-iluminacao-sim" data-onchange="toggleCampos('gin-iluminacao')"><label for="gin-iluminacao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-iluminacao-nao" data-onchange="toggleCampos('gin-iluminacao')"><label for="gin-iluminacao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-iluminacao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Dimerizável?</div><select class="rider-input" id="gin-iluminacao-dimerizavel" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Por Setores?</div><select class="rider-input" id="gin-iluminacao-setores" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Permite Blackout?</div><select class="rider-input" id="gin-iluminacao-blackout" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-iluminacao-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- 5. BASTIDORES, LOGÍSTICA E ACESSIBILIDADE -->
+            <div class="section-title">5️⃣ BASTIDORES, LOGÍSTICA E ACESSIBILIDADE</div>
+
+            <div class="rider-section">
+                <h4>Pontos de Ancoragem (Rigg - Teto)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-rigg-sim" data-onchange="toggleCampos('gin-rigg')"><label for="gin-rigg-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-rigg-nao" data-onchange="toggleCampos('gin-rigg')"><label for="gin-rigg-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-rigg-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade de Pontos</div><input type="number" class="rider-input" id="gin-rigg-qtd" disabled></div>
+                        <div><div class="rider-label">Carga por Ponto (kg)</div><input type="number" class="rider-input" id="gin-rigg-carga" disabled></div>
+                        <div><div class="rider-label">Estrutura Adequada?</div><select class="rider-input" id="gin-rigg-estrutura" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-rigg-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Camarins / Vestiários Adaptáveis</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-camarins-sim" data-onchange="toggleCampos('gin-camarins')"><label for="gin-camarins-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-camarins-nao" data-onchange="toggleCampos('gin-camarins')"><label for="gin-camarins-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-camarins-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade de Vestiários</div><input type="number" class="rider-input" id="gin-camarins-qtd" disabled></div>
+                        <div><div class="rider-label">Com Espelhos?</div><select class="rider-input" id="gin-camarins-espelhos" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Com Tomadas?</div><select class="rider-input" id="gin-camarins-tomadas" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="rider-row">
+                        <div><div class="rider-label">Chuveiro Quente?</div><select class="rider-input" id="gin-camarins-chuveiro" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Condição</div><select class="rider-input" id="gin-camarins-cond" disabled><option>Bom</option><option>Regular</option><option>Ruim</option></select></div>
+                        <div></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-camarins-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Entrada de Carga (Portão de Acesso)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-entrada-carga-sim" data-onchange="toggleCampos('gin-entrada-carga')"><label for="gin-entrada-carga-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-entrada-carga-nao" data-onchange="toggleCampos('gin-entrada-carga')"><label for="gin-entrada-carga-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-entrada-carga-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Altura (m)</div><input type="number" class="rider-input" id="gin-entrada-carga-altura" step="0.5" disabled></div>
+                        <div><div class="rider-label">Largura (m)</div><input type="number" class="rider-input" id="gin-entrada-carga-largura" step="0.5" disabled></div>
+                        <div><div class="rider-label">Caminhão até a Quadra?</div><select class="rider-input" id="gin-entrada-carga-caminhao" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-entrada-carga-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Acessibilidade à Quadra (Cadeirantes)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-acessibilidade-sim" data-onchange="toggleCampos('gin-acessibilidade')"><label for="gin-acessibilidade-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-acessibilidade-nao" data-onchange="toggleCampos('gin-acessibilidade')"><label for="gin-acessibilidade-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-acessibilidade-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo de Acesso</div><input type="text" class="rider-input" id="gin-acessibilidade-tipo" placeholder="Ex: Rampa/Elevador/Plataforma" disabled></div>
+                        <div><div class="rider-label">Para Artistas PNE?</div><select class="rider-input" id="gin-acessibilidade-artistas" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Para Público?</div><select class="rider-input" id="gin-acessibilidade-publico" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-acessibilidade-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- SEGURANÇA E DOCUMENTAÇÃO LEGAL - NOVO -->
+            <div class="section-title">🔒 SEGURANÇA E DOCUMENTAÇÃO LEGAL</div>
+
+            <div class="rider-section">
+                <h4>AVCB (Alvará de Corpo de Bombeiros)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-seg-avcb-sim" data-onchange="toggleCampos('gin-seg-avcb')"><label for="gin-seg-avcb-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-seg-avcb-nao" data-onchange="toggleCampos('gin-seg-avcb')"><label for="gin-seg-avcb-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-seg-avcb-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Válido?</div><select class="rider-input" id="gin-seg-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="gin-seg-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="gin-seg-avcb-numero" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-seg-avcb-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Extintores de Incêndio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-seg-extintores-sim" data-onchange="toggleCampos('gin-seg-extintores')"><label for="gin-seg-extintores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-seg-extintores-nao" data-onchange="toggleCampos('gin-seg-extintores')"><label for="gin-seg-extintores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-seg-extintores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="gin-seg-extintores-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo (ABC/CO2)</div><input type="text" class="rider-input" id="gin-seg-extintores-tipo" disabled></div>
+                        <div><div class="rider-label">Vencido?</div><select class="rider-input" id="gin-seg-extintores-vencido" disabled><option>Não</option><option>Sim</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-seg-extintores-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Rotas de Fuga e Sinalização</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-seg-rotas-fuga-sim" data-onchange="toggleCampos('gin-seg-rotas-fuga')"><label for="gin-seg-rotas-fuga-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-seg-rotas-fuga-nao" data-onchange="toggleCampos('gin-seg-rotas-fuga')"><label for="gin-seg-rotas-fuga-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-seg-rotas-fuga-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Saídas de Emergência</div><input type="number" class="rider-input" id="gin-seg-rotas-fuga-saidas" disabled></div>
+                        <div><div class="rider-label">Sinalização Luminosa?</div><select class="rider-input" id="gin-seg-rotas-fuga-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Desobstruída?</div><select class="rider-input" id="gin-seg-rotas-fuga-desobstruida" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-seg-rotas-fuga-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="rider-section">
+                <h4>Alvarás e Licenças</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="gin-seg-alvaras-sim" data-onchange="toggleCampos('gin-seg-alvaras')"><label for="gin-seg-alvaras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="gin-seg-alvaras-nao" data-onchange="toggleCampos('gin-seg-alvaras')"><label for="gin-seg-alvaras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="gin-seg-alvaras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Funcionamento Válido?</div><select class="rider-input" id="gin-seg-alvaras-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Sanitário Válido?</div><select class="rider-input" id="gin-seg-alvaras-sanitario" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Outros?</div><input type="text" class="rider-input" id="gin-seg-alvaras-outros" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-seg-alvaras-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <!-- INFORMAÇÕES COMPLEMENTARES -->
+            <div class="section-title">📝 INFORMAÇÕES COMPLEMENTARES</div>
+            <div class="form-group"><label>Observações Gerais e Recomendações</label><textarea id="ginasio-desc-geral" placeholder="Condições especiais, restrições de uso, eventos anteriores, etc."></textarea></div>
+
+            <button class="btn btn-success" data-onclick="saveForm('ginasio')">✓ SALVAR GINÁSIO</button>
+        </div>
+    </div>
+</div>
+
+    <!-- ESPAÇO GENÉRICO / MULTIUSO -->
+    <div id="generico" class="content">
+        <button class="btn" style="background: #999; color: white; margin-bottom: 15px;" data-onclick="showTab('menu')">← Voltar</button>
+        <div class="equipamento-card">
+            <h3>🏢 INVENTÁRIO TÉCNICO - ESPAÇO GENÉRICO / MULTIUSO</h3>
+            <p style="font-size:13px;color:#666;margin:4px 0 12px;">Para escolas, centros sociais, centros culturais, igrejas, galpões e outros locais que não se enquadram nas categorias anteriores.</p>
+
+            <div class="section-title">📌 IDENTIFICAÇÃO DO ESPAÇO</div>
+            <div class="form-group"><label>Nome do Espaço</label><input type="text" id="generico-nome" placeholder="Ex: Escola Municipal X, Centro Social Y, Igreja Z"></div>
+            <div class="form-group"><label>Tipo de Espaço</label>
+                <select id="generico-tipo">
+                    <option value="">Selecione...</option>
+                    <option>Escola / Unidade de Ensino</option>
+                    <option>Centro Social / Assistência</option>
+                    <option>Centro Cultural / Espaço Cultural</option>
+                    <option>Igreja / Templo / Espaço Religioso</option>
+                    <option>Clube / Associação Recreativa</option>
+                    <option>Salão de Festas / Salão Paroquial</option>
+                    <option>Galpão / Barracão</option>
+                    <option>Associação de Bairro / Comunitária</option>
+                    <option>CRAS / CREAS / Equipamento Público</option>
+                    <option>Espaço Privado / Comercial</option>
+                    <option>Outro</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Endereço / Localização</label><textarea id="generico-endereco" placeholder="Endereço completo, bairro, ponto de referência"></textarea></div>
+            <div class="form-group"><label>Telefone</label><input type="text" id="generico-telefone" placeholder="(00) 0000-0000"></div>
+            <div class="form-group"><label>Email / Contato</label><input type="text" id="generico-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Responsável / Gestor do Espaço</label><input type="text" id="generico-responsavel"></div>
+            <div class="form-group"><label>Vínculo / Natureza</label>
+                <select id="generico-vinculo">
+                    <option value="">Selecione...</option>
+                    <option>Público Municipal</option>
+                    <option>Público Estadual</option>
+                    <option>Público Federal</option>
+                    <option>Privado</option>
+                    <option>ONG / Terceiro Setor</option>
+                    <option>Religioso</option>
+                    <option>Comunitário / Associação</option>
+                    <option>Misto / Parceria</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Capacidade Estimada (pessoas)</label><input type="number" id="generico-capacidade"></div>
+            <div class="form-group"><label>Área Aproximada (m²)</label><input type="number" id="generico-area"></div>
+            <div class="form-group"><label>Horário de Funcionamento / Disponibilidade</label><input type="text" id="generico-horario" placeholder="Ex: Seg-Sex 8h-18h; finais de semana sob agendamento"></div>
+            <div class="form-group"><label>Já recebe atividades culturais atualmente?</label>
+                <select id="generico-ja-cultural">
+                    <option value="">Selecione...</option>
+                    <option>Sim, regularmente</option>
+                    <option>Sim, eventualmente</option>
+                    <option>Não, mas tem interesse/potencial</option>
+                    <option>Não</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Observações da Identificação</label><textarea id="generico-id-obs" placeholder="Informações adicionais sobre o espaço e seu uso"></textarea></div>
+
+            <div class="section-title">1️⃣ CARACTERIZAÇÃO E AMBIENTES DO ESPAÇO</div>
+
+            <div class="rider-section">
+                <h4>Salão / Espaço Amplo Interno</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-salao-sim" data-onchange="toggleCampos('generico-salao')"><label for="generico-salao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-salao-nao" data-onchange="toggleCampos('generico-salao')"><label for="generico-salao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-salao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Dimensões (m)</div><input type="text" class="rider-input" id="generico-salao-dim" placeholder="Ex: 15x20" disabled></div>
+                        <div><div class="rider-label">Pé-direito (altura, m)</div><input type="text" class="rider-input" id="generico-salao-pedireito" disabled></div>
+                        <div><div class="rider-label">Capacidade (pessoas)</div><input type="number" class="rider-input" id="generico-salao-cap" disabled></div>
+                        <div><div class="rider-label">Tipo de Piso</div><input type="text" class="rider-input" id="generico-salao-piso" placeholder="Ex: Cerâmica/Cimento/Madeira" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-salao-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Palco ou Tablado</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-palco-sim" data-onchange="toggleCampos('generico-palco')"><label for="generico-palco-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-palco-nao" data-onchange="toggleCampos('generico-palco')"><label for="generico-palco-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-palco-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Dimensões (m)</div><input type="text" class="rider-input" id="generico-palco-dim" disabled></div>
+                        <div><div class="rider-label">Altura (m)</div><input type="text" class="rider-input" id="generico-palco-altura" disabled></div>
+                        <div><div class="rider-label">Fixo ou Móvel?</div><select class="rider-input" id="generico-palco-tipo" disabled><option>Fixo</option><option>Móvel</option><option>Improvisado</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-palco-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Área Externa / Pátio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-externa-sim" data-onchange="toggleCampos('generico-externa')"><label for="generico-externa-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-externa-nao" data-onchange="toggleCampos('generico-externa')"><label for="generico-externa-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-externa-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Dimensões (m)</div><input type="text" class="rider-input" id="generico-externa-dim" disabled></div>
+                        <div><div class="rider-label">Coberta?</div><select class="rider-input" id="generico-externa-coberta" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Tipo de Piso</div><input type="text" class="rider-input" id="generico-externa-piso" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-externa-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Salas Auxiliares / Multiuso</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-salas-sim" data-onchange="toggleCampos('generico-salas')"><label for="generico-salas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-salas-nao" data-onchange="toggleCampos('generico-salas')"><label for="generico-salas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-salas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="generico-salas-qtd" disabled></div>
+                        <div><div class="rider-label">Capacidade Média (cada)</div><input type="number" class="rider-input" id="generico-salas-cap" disabled></div>
+                        <div><div class="rider-label">Climatizadas?</div><select class="rider-input" id="generico-salas-clima" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-salas-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Cozinha / Copa</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-cozinha-sim" data-onchange="toggleCampos('generico-cozinha')"><label for="generico-cozinha-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-cozinha-nao" data-onchange="toggleCampos('generico-cozinha')"><label for="generico-cozinha-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-cozinha-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Industrial?</div><select class="rider-input" id="generico-cozinha-industrial" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Fogão?</div><select class="rider-input" id="generico-cozinha-fogao" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Geladeira/Freezer?</div><select class="rider-input" id="generico-cozinha-geladeira" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-cozinha-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Camarim / Sala de Apoio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-camarim-sim" data-onchange="toggleCampos('generico-camarim')"><label for="generico-camarim-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-camarim-nao" data-onchange="toggleCampos('generico-camarim')"><label for="generico-camarim-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-camarim-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="generico-camarim-qtd" disabled></div>
+                        <div><div class="rider-label">Com Espelho?</div><select class="rider-input" id="generico-camarim-espelho" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Com Sanitário Próprio?</div><select class="rider-input" id="generico-camarim-sanitario" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-camarim-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Depósito / Almoxarifado</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-deposito-sim" data-onchange="toggleCampos('generico-deposito')"><label for="generico-deposito-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-deposito-nao" data-onchange="toggleCampos('generico-deposito')"><label for="generico-deposito-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-deposito-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="generico-deposito-qtd" disabled></div>
+                        <div><div class="rider-label">Área Aproximada (m²)</div><input type="text" class="rider-input" id="generico-deposito-area" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-deposito-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Estacionamento</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-estacionamento-sim" data-onchange="toggleCampos('generico-estacionamento')"><label for="generico-estacionamento-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-estacionamento-nao" data-onchange="toggleCampos('generico-estacionamento')"><label for="generico-estacionamento-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-estacionamento-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Vagas (aprox.)</div><input type="number" class="rider-input" id="generico-estacionamento-vagas" disabled></div>
+                        <div><div class="rider-label">Coberto?</div><select class="rider-input" id="generico-estacionamento-coberto" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-estacionamento-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="section-title">2️⃣ EQUIPAMENTOS E INFRAESTRUTURA TÉCNICA DISPONÍVEL</div>
+
+            <div class="rider-section">
+                <h4>Energia Elétrica / Quadro de Força</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-energia-sim" data-onchange="toggleCampos('generico-energia')"><label for="generico-energia-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-energia-nao" data-onchange="toggleCampos('generico-energia')"><label for="generico-energia-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-energia-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tensão</div><select class="rider-input" id="generico-energia-tensao" disabled><option>110V</option><option>220V</option><option>Bifásico</option><option>Trifásico</option><option>Não sei</option></select></div>
+                        <div><div class="rider-label">Amperagem / Carga Disponível</div><input type="text" class="rider-input" id="generico-energia-amperagem" disabled></div>
+                        <div><div class="rider-label">Quadro com Disjuntores?</div><select class="rider-input" id="generico-energia-quadro" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-energia-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Tomadas / Pontos de Energia</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-tomadas-sim" data-onchange="toggleCampos('generico-tomadas')"><label for="generico-tomadas-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-tomadas-nao" data-onchange="toggleCampos('generico-tomadas')"><label for="generico-tomadas-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-tomadas-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade Aproximada</div><input type="number" class="rider-input" id="generico-tomadas-qtd" disabled></div>
+                        <div><div class="rider-label">Bem Distribuídas no Espaço?</div><select class="rider-input" id="generico-tomadas-distrib" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-tomadas-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Iluminação do Ambiente</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-iluminacao-sim" data-onchange="toggleCampos('generico-iluminacao')"><label for="generico-iluminacao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-iluminacao-nao" data-onchange="toggleCampos('generico-iluminacao')"><label for="generico-iluminacao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-iluminacao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Tipo</div><input type="text" class="rider-input" id="generico-iluminacao-tipo" placeholder="Ex: LED/Fluorescente" disabled></div>
+                        <div><div class="rider-label">Suficiente para Eventos?</div><select class="rider-input" id="generico-iluminacao-sufic" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Possui Iluminação Cênica/Refletores?</div><select class="rider-input" id="generico-iluminacao-cenica" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-iluminacao-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Sistema de Som / Áudio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-som-sim" data-onchange="toggleCampos('generico-som')"><label for="generico-som-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-som-nao" data-onchange="toggleCampos('generico-som')"><label for="generico-som-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-som-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Caixas de Som</div><input type="number" class="rider-input" id="generico-som-caixas" disabled></div>
+                        <div><div class="rider-label">Microfones</div><input type="number" class="rider-input" id="generico-som-microfones" disabled></div>
+                        <div><div class="rider-label">Mesa de Som?</div><select class="rider-input" id="generico-som-mesa" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-som-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Projeção / Telão / TV</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-projecao-sim" data-onchange="toggleCampos('generico-projecao')"><label for="generico-projecao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-projecao-nao" data-onchange="toggleCampos('generico-projecao')"><label for="generico-projecao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-projecao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Projetor?</div><select class="rider-input" id="generico-projecao-projetor" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Telão/Tela?</div><select class="rider-input" id="generico-projecao-tela" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">TV/Monitor?</div><select class="rider-input" id="generico-projecao-tv" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-projecao-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Internet / Wi-Fi</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-internet-sim" data-onchange="toggleCampos('generico-internet')"><label for="generico-internet-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-internet-nao" data-onchange="toggleCampos('generico-internet')"><label for="generico-internet-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-internet-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Disponível?</div><select class="rider-input" id="generico-internet-disp" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Velocidade Aproximada</div><input type="text" class="rider-input" id="generico-internet-vel" placeholder="Ex: 100 Mbps" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-internet-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Climatização / Ventilação</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-climatizacao-sim" data-onchange="toggleCampos('generico-climatizacao')"><label for="generico-climatizacao-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-climatizacao-nao" data-onchange="toggleCampos('generico-climatizacao')"><label for="generico-climatizacao-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-climatizacao-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Ar-condicionado?</div><select class="rider-input" id="generico-climatizacao-ar" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Ventiladores</div><input type="number" class="rider-input" id="generico-climatizacao-vent" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-climatizacao-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Mobiliário Disponível</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-mobiliario-sim" data-onchange="toggleCampos('generico-mobiliario')"><label for="generico-mobiliario-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-mobiliario-nao" data-onchange="toggleCampos('generico-mobiliario')"><label for="generico-mobiliario-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-mobiliario-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Cadeiras</div><input type="number" class="rider-input" id="generico-mobiliario-cadeiras" disabled></div>
+                        <div><div class="rider-label">Mesas</div><input type="number" class="rider-input" id="generico-mobiliario-mesas" disabled></div>
+                        <div><div class="rider-label">Disponível para Eventos?</div><select class="rider-input" id="generico-mobiliario-disp" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-mobiliario-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Sanitários</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-sanitarios-sim" data-onchange="toggleCampos('generico-sanitarios')"><label for="generico-sanitarios-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-sanitarios-nao" data-onchange="toggleCampos('generico-sanitarios')"><label for="generico-sanitarios-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-sanitarios-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Total de Sanitários</div><input type="number" class="rider-input" id="generico-sanitarios-qtd" disabled></div>
+                        <div><div class="rider-label">Separados por Gênero?</div><select class="rider-input" id="generico-sanitarios-genero" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Em Boas Condições?</div><select class="rider-input" id="generico-sanitarios-cond" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-sanitarios-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="section-title">3️⃣ ACESSIBILIDADE</div>
+
+            <div class="rider-section">
+                <h4>Rampa de Acesso</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-rampa-sim" data-onchange="toggleCampos('generico-rampa')"><label for="generico-rampa-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-rampa-nao" data-onchange="toggleCampos('generico-rampa')"><label for="generico-rampa-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-rampa-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Atende a Norma (inclinação)?</div><select class="rider-input" id="generico-rampa-norma" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Corrimão?</div><select class="rider-input" id="generico-rampa-corrimao" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-rampa-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Banheiro Acessível (PCD)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-banheiro-pcd-sim" data-onchange="toggleCampos('generico-banheiro-pcd')"><label for="generico-banheiro-pcd-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-banheiro-pcd-nao" data-onchange="toggleCampos('generico-banheiro-pcd')"><label for="generico-banheiro-pcd-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-banheiro-pcd-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="generico-banheiro-pcd-qtd" disabled></div>
+                        <div><div class="rider-label">Com Barras de Apoio?</div><select class="rider-input" id="generico-banheiro-pcd-barras" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-banheiro-pcd-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Piso Tátil / Sinalização Acessível</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-piso-tatil-sim" data-onchange="toggleCampos('generico-piso-tatil')"><label for="generico-piso-tatil-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-piso-tatil-nao" data-onchange="toggleCampos('generico-piso-tatil')"><label for="generico-piso-tatil-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-piso-tatil-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Piso Tátil?</div><select class="rider-input" id="generico-piso-tatil-piso" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Sinalização Visual/Braille?</div><select class="rider-input" id="generico-piso-tatil-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-piso-tatil-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Vagas PCD / Estacionamento Acessível</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-vagas-pcd-sim" data-onchange="toggleCampos('generico-vagas-pcd')"><label for="generico-vagas-pcd-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-vagas-pcd-nao" data-onchange="toggleCampos('generico-vagas-pcd')"><label for="generico-vagas-pcd-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-vagas-pcd-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade de Vagas PCD</div><input type="number" class="rider-input" id="generico-vagas-pcd-qtd" disabled></div>
+                        <div><div class="rider-label">Rota Acessível até a Entrada?</div><select class="rider-input" id="generico-vagas-pcd-rota" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-vagas-pcd-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="section-title">4️⃣ SEGURANÇA E DOCUMENTAÇÃO LEGAL</div>
+
+            <div class="rider-section">
+                <h4>AVCB (Auto de Vistoria do Corpo de Bombeiros)</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-avcb-sim" data-onchange="toggleCampos('generico-avcb')"><label for="generico-avcb-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-avcb-nao" data-onchange="toggleCampos('generico-avcb')"><label for="generico-avcb-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-avcb-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Válido?</div><select class="rider-input" id="generico-avcb-valido" disabled><option>Sim</option><option>Não</option><option>Vencido</option><option>Em processo</option></select></div>
+                        <div><div class="rider-label">Data de Vencimento</div><input type="text" class="rider-input" id="generico-avcb-venc" disabled></div>
+                        <div><div class="rider-label">Nº do Processo</div><input type="text" class="rider-input" id="generico-avcb-processo" disabled></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-avcb-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Extintores de Incêndio</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-extintores-sim" data-onchange="toggleCampos('generico-extintores')"><label for="generico-extintores-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-extintores-nao" data-onchange="toggleCampos('generico-extintores')"><label for="generico-extintores-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-extintores-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Quantidade</div><input type="number" class="rider-input" id="generico-extintores-qtd" disabled></div>
+                        <div><div class="rider-label">Tipo (ABC/CO2/etc.)</div><input type="text" class="rider-input" id="generico-extintores-tipo" disabled></div>
+                        <div><div class="rider-label">Dentro da Validade?</div><select class="rider-input" id="generico-extintores-validade" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-extintores-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Rotas de Fuga / Saídas de Emergência</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-rotas-fuga-sim" data-onchange="toggleCampos('generico-rotas-fuga')"><label for="generico-rotas-fuga-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-rotas-fuga-nao" data-onchange="toggleCampos('generico-rotas-fuga')"><label for="generico-rotas-fuga-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-rotas-fuga-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Nº de Saídas</div><input type="number" class="rider-input" id="generico-rotas-fuga-saidas" disabled></div>
+                        <div><div class="rider-label">Sinalização Luminosa?</div><select class="rider-input" id="generico-rotas-fuga-sinal" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Desobstruídas?</div><select class="rider-input" id="generico-rotas-fuga-desobst" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-rotas-fuga-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Alvarás e Licenças</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-alvaras-sim" data-onchange="toggleCampos('generico-alvaras')"><label for="generico-alvaras-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-alvaras-nao" data-onchange="toggleCampos('generico-alvaras')"><label for="generico-alvaras-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-alvaras-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Alvará de Funcionamento Válido?</div><select class="rider-input" id="generico-alvaras-func" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Licença Sanitária Válida?</div><select class="rider-input" id="generico-alvaras-sanitaria" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-alvaras-obs" disabled></textarea></div>
+                </div>
+            </div>
+            <div class="rider-section">
+                <h4>Iluminação de Emergência</h4>
+                <div class="checkbox-box-top">
+                    <div class="checkbox-item"><input type="checkbox" id="generico-ilum-emergencia-sim" data-onchange="toggleCampos('generico-ilum-emergencia')"><label for="generico-ilum-emergencia-sim">( ) Possui</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="generico-ilum-emergencia-nao" data-onchange="toggleCampos('generico-ilum-emergencia')"><label for="generico-ilum-emergencia-nao">( ) Não Possui</label></div>
+                </div>
+                <div id="generico-ilum-emergencia-campos" class="campos-desabilitados">
+                    <div class="rider-row">
+                        <div><div class="rider-label">Possui?</div><select class="rider-input" id="generico-ilum-emergencia-possui" disabled><option>Sim</option><option>Não</option></select></div>
+                        <div><div class="rider-label">Funcionando/Testada?</div><select class="rider-input" id="generico-ilum-emergencia-func" disabled><option>Sim</option><option>Não</option></select></div>
+                    </div>
+                    <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-ilum-emergencia-obs" disabled></textarea></div>
+                </div>
+            </div>
+
+            <div class="section-title">📝 INFORMAÇÕES COMPLEMENTARES</div>
+            <div class="form-group"><label>Restrições de Uso do Espaço</label><textarea id="generico-restricoes" placeholder="Ex: não permite som após 22h, uso religioso prioritário, etc."></textarea></div>
+            <div class="form-group"><label>Adaptações Necessárias para Uso Cultural</label><textarea id="generico-adaptacoes" placeholder="O que precisaria ser providenciado para receber eventos culturais"></textarea></div>
+            <div class="form-group"><label>Observações Gerais e Recomendações</label><textarea id="generico-desc-geral" placeholder="Potencialidades, histórico de uso, contato adicional, etc."></textarea></div>
+
+            <!-- ✅ NOVO: Adicionar Fotos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📷 Adicionar Fotos</label>
+                <div id="generico-fotos-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #667eea; min-height: 40px;">
+                    <small style="color: #999;">Nenhuma foto adicionada</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="generico-foto-desc" placeholder="Descrição (ex: Fachada)">
+                    <input type="file" id="generico-foto-file" accept="image/*">
+                    <button type="button" onclick="adicionarFoto('generico')" style="padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <!-- ✅ NOVO: Adicionar Documentos -->
+            <div class="form-group">
+                <label style="font-weight: bold; color: #333;">📄 Adicionar Documentos</label>
+                <div id="generico-docs-lista" style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #764ba2; min-height: 40px;">
+                    <small style="color: #999;">Nenhum documento adicionado</small>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="generico-doc-desc" placeholder="Descrição (ex: Projeto)">
+                    <input type="file" id="generico-doc-file" accept=".pdf">
+                    <button type="button" onclick="adicionarDocumento('generico')" style="padding: 10px; background: #764ba2; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">Adicionar</button>
+                </div>
+            </div>
+
+            <button class="btn btn-success" data-onclick="saveFormGenerico()">✓ SALVAR ESPAÇO GENÉRICO</button>
+        </div>
+    </div>
+
+<script>
+let municipios = {};      // Estrutura: { "chave-municipal": { nome, responsavel, ..., equipamentos: { teatro: [...] } } }
+let municipioAtual = null; // Chave do município selecionado
+let dados = {};             // Alias para municipios[municipioAtual].equipamentos (carregado dinamicamente)
+
+let municipioData = {};     // Mantém compatibilidade (legado)
+
+// ===== CONFIGURAÇÃO GOOGLE DRIVE =====
+const GOOGLE_DRIVE_CONFIG = {
+    CLIENT_ID: '504827027877-avojd4rg8p7279hnq2l1upfutal427b3.apps.googleusercontent.com',
+    SCOPES: ['https://www.googleapis.com/auth/drive.file'],
+    PASTA_MAE_ID: '1GRA91-gmzF7gev_9IghyhZckGajnsEzB' // ID da pasta mãe
+};
+
+// ===== CONFIGURAÇÃO DO SERVIDOR VERCEL =====
+const SERVIDOR_URL = 'https://inventario-equipamentos-paulo.vercel.app';
+
+let googleAuthToken = null;
+let pastasMunicipio = {}; // { 'rio-claro': 'ID_DA_PASTA', ... }
+
+// ===== FUNÇÕES GOOGLE DRIVE =====
+
+// Criar pasta para município no Google Drive
+async function criarPastaMunicipio(nomeMunicipio) {
     try {
-      const fileInfo = await drive.files.get({
-        fileId: pastaId,
-        fields: 'id, name, webViewLink',
-        supportsTeamDrives: true,
-      });
-      console.log(`[API] ✅ Pasta encontrada:`, fileInfo.data.name);
-    } catch (checkError) {
-      console.error(`[API] ⚠️ Pasta não encontrada ou sem acesso:`, checkError.message);
-      throw new Error(`Pasta não encontrada ou sem acesso: ${checkError.message}`);
-    }
+        console.log('📍 Iniciando criação de pasta:', nomeMunicipio);
+        console.log('🔗 URL:', `${SERVIDOR_URL}/api/uploadGoogleDrive`);
+        
+        const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                acao: 'criar-pasta',
+                nomePasta: nomeMunicipio,
+                pastaParentId: GOOGLE_DRIVE_CONFIG.PASTA_MAE_ID
+            }),
+            mode: 'cors'
+        });
 
-    // ✅ NOVO: Compartilhar com a Service Account antes de deletar
-    const serviceAccountEmail = serviceAccount.client_email;
-    try {
-      await drive.permissions.create({
-        fileId: pastaId,
-        resource: {
-          kind: 'drive#permission',
-          type: 'user',
-          role: 'owner',
-          emailAddress: serviceAccountEmail,
-        },
-        fields: 'id',
-        supportsTeamDrives: true,
-      });
-      console.log(`[API] ✅ Permissões atualizadas para Service Account`);
-    } catch (permError) {
-      console.log(`[API] ℹ️ Permissões já existem ou erro (continuando):`, permError.message);
-    }
-
-    // ✅ Agora deletar a pasta
-    await drive.files.delete({
-      fileId: pastaId,
-      supportsTeamDrives: true,
-    });
-
-    console.log(`[API] ✅ Pasta ${pastaId} deletada com sucesso`);
-    return { sucesso: true, mensagem: 'Pasta deletada com sucesso' };
-  } catch (error) {
-    console.error(`[API] Erro ao deletar pasta ${pastaId}:`, error.message);
-    throw new Error(`Erro ao deletar pasta: ${error.message}`);
-  }
-}
-
-// ============================================
-// HANDLER VERCEL
-// ============================================
-
-module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  try {
-    // Verificar se auth está configurada
-    if (!auth) {
-      return res.status(500).json({
-        sucesso: false,
-        erro: 'Credenciais do Google não configuradas. Configure GOOGLE_APPLICATION_CREDENTIALS_JSON no Vercel.',
-      });
-    }
-
-    const { acao, municipio, nomePasta, tipo, equipamento, pastaId } = req.body;
-    
-    // Aceitar tanto 'municipio' quanto 'nomePasta'
-    const nomeMunicipio = municipio || nomePasta;
-
-    console.log(`[API] Ação: ${acao}, Município: ${nomeMunicipio}`);
-
-    // ============================================
-    // CRIAR PASTA DO MUNICÍPIO
-    // ============================================
-    if (acao === 'criar-pasta') {
-      const pastaRaiz = PASTA_EQUIPAMENTOS_ID; // ✅ Usar pasta de equipamentos como raiz
-      const result = await criarPasta(nomeMunicipio, pastaRaiz);
-      
-      // ✅ GARANTIR que o ID está correto
-      console.log(`[API] Retornando pastaId: ${result.id}`);
-      
-      return res.status(200).json({
-        sucesso: true,
-        pastaId: result.id, // ✅ CRÍTICO: Usar result.id diretamente
-        nomePasta: result.name,
-        webViewLink: result.webViewLink,
-        mensagem: 'Pasta do município criada com sucesso',
-      });
-    }
-
-    // ============================================
-    // CRIAR SUBPASTA DO EQUIPAMENTO
-    // ============================================
-    if (acao === 'criar-subpasta') {
-      const { nomeSubpasta, pastaParentId } = req.body;
-      
-      // Usar pastaParentId se fornecido, senão usar pasta de equipamentos
-      const pastaRaiz = pastaParentId || PASTA_EQUIPAMENTOS_ID;
-      
-      const result = await criarPasta(nomeSubpasta, pastaRaiz);
-      return res.status(200).json({
-        sucesso: true,
-        subpastaId: result.id,
-        nomePasta: result.name,
-        mensagem: 'Subpasta do equipamento criada',
-      });
-    }
-
-    // ============================================
-    // UPLOAD DE FOTO
-    // ============================================
-    if (acao === 'upload-foto') {
-      const { nomeArquivo, conteudoBase64 } = req.body;
-      const result = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
-      return res.status(200).json({
-        sucesso: true,
-        arquivoId: result.id,
-        nomeArquivo: result.name,
-        link: result.webViewLink,
-        mensagem: 'Foto enviada com sucesso',
-      });
-    }
-
-    // ============================================
-    // UPLOAD DE DOCUMENTO
-    // ============================================
-    if (acao === 'upload-documento') {
-      const { nomeArquivo, conteudoBase64 } = req.body;
-      const result = await uploadArquivo(nomeArquivo, conteudoBase64, pastaId);
-      return res.status(200).json({
-        sucesso: true,
-        arquivoId: result.id,
-        nomeArquivo: result.name,
-        link: result.webViewLink,
-        mensagem: 'Documento enviado com sucesso',
-      });
-    }
-
-    // ============================================
-    // DELETAR PASTA
-    // ============================================
-    if (acao === 'deletar-pasta') {
-      try {
-        if (!pastaId) {
-          return res.status(400).json({
-            sucesso: false,
-            erro: 'pastaId não fornecido',
-          });
+        console.log('📦 Status da resposta:', response.status);
+        
+        if (!response.ok) {
+            console.error('❌ Resposta não OK:', response.status, response.statusText);
+            showMsg(`❌ Erro do servidor: ${response.status}`);
+            return null;
         }
 
-        const result = await deletarPasta(pastaId);
-        return res.status(200).json({
-          sucesso: true,
-          mensagem: 'Pasta deletada com sucesso',
-          ...result,
+        const dados = await response.json();
+        console.log('📋 Dados recebidos:', dados);
+        
+        if (dados.sucesso) {
+            // ✅ Normalizar chave para minúsculas
+            const chaveMunicipio = municipioAtual.toLowerCase().trim();
+            pastasMunicipio[chaveMunicipio] = dados.pastaId;
+            localStorage.setItem('pastasMunicipio', JSON.stringify(pastasMunicipio));
+            console.log(`✅ Pasta criada para ${nomeMunicipio}`, chaveMunicipio, dados.pastaId);
+            showMsg('✅ Pasta criada no Google Drive!');
+            return dados.pastaId;
+        } else {
+            console.error('❌ Erro ao criar pasta:', dados.erro);
+            showMsg('❌ Erro ao criar pasta: ' + dados.erro);
+            return null;
+        }
+    } catch (erro) {
+        console.error('❌ Erro na requisição:', erro);
+        console.error('Detalhes:', erro.message);
+        showMsg('❌ Erro ao conectar com servidor: ' + erro.message);
+        return null;
+    }
+}
+
+// Fazer upload de foto para Google Drive
+async function uploadFotoParaGoogleDrive(arquivo, nomeArquivo, tipoEquipamento) {
+    try {
+        if (!municipioAtual || !pastasMunicipio[municipioAtual]) {
+            showMsg('⚠️ Pasta do município não encontrada');
+            return null;
+        }
+
+        // Converter arquivo para base64
+        const reader = new FileReader();
+        
+        return new Promise((resolve, reject) => {
+            reader.onload = async (e) => {
+                try {
+                    const base64 = e.target.result.split(',')[1];
+                    
+                    const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            acao: 'upload',
+                            nomeArquivo: nomeArquivo,
+                            conteudoBase64: base64,
+                            pastaId: pastasMunicipio[municipioAtual]
+                        }),
+                        mode: 'cors'
+                    });
+
+                    const dados = await response.json();
+                    
+                    if (dados.sucesso) {
+                        showMsg(`✅ Foto enviada: ${nomeArquivo}`);
+                        resolve(dados.link);
+                    } else {
+                        showMsg('❌ Erro ao enviar foto: ' + dados.erro);
+                        reject(dados.erro);
+                    }
+                } catch (erro) {
+                    console.error('❌ Erro:', erro);
+                    showMsg('❌ Erro ao processar foto');
+                    reject(erro);
+                }
+            };
+            
+            reader.readAsDataURL(arquivo);
         });
-      } catch (error) {
-        return res.status(500).json({
-          sucesso: false,
-          erro: error.message,
+    } catch (erro) {
+        console.error('❌ Erro na função de upload:', erro);
+        showMsg('❌ Erro ao fazer upload');
+        return null;
+    }
+}
+
+// ============================================================
+// FUNÇÕES V3.0 - SUBPASTAS, MÚLTIPLAS FOTOS/DOCS
+// ============================================================
+
+let fotosTemporarias = {};
+let documentosTemporarios = {};
+let subpastasEquipamentos = {};
+
+// Adicionar Foto
+function adicionarFoto(tipo) {
+    const descricao = document.getElementById(tipo + '-foto-desc')?.value.trim();
+    const fileInput = document.getElementById(tipo + '-foto-file');
+    
+    if (!descricao) {
+        showMsg('⚠️ Digite uma descrição para a foto');
+        return;
+    }
+    
+    if (!fileInput || !fileInput.files.length) {
+        showMsg('⚠️ Selecione uma foto');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+        if (!fotosTemporarias[tipo]) fotosTemporarias[tipo] = [];
+        fotosTemporarias[tipo].push({
+            descricao: descricao,
+            base64: e.target.result.split(',')[1],
+            nome: file.name
         });
-      }
+        
+        fileInput.value = '';
+        document.getElementById(tipo + '-foto-desc').value = '';
+        atualizarListaFotos(tipo);
+        showMsg('✅ Foto adicionada');
+    };
+    reader.readAsDataURL(file);
+}
+
+// Adicionar Documento
+function adicionarDocumento(tipo) {
+    const descricao = document.getElementById(tipo + '-doc-desc')?.value.trim();
+    const fileInput = document.getElementById(tipo + '-doc-file');
+    
+    if (!descricao) {
+        showMsg('⚠️ Digite uma descrição para o documento');
+        return;
+    }
+    
+    if (!fileInput || !fileInput.files.length) {
+        showMsg('⚠️ Selecione um PDF');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+        if (!documentosTemporarios[tipo]) documentosTemporarios[tipo] = [];
+        documentosTemporarios[tipo].push({
+            descricao: descricao,
+            base64: e.target.result.split(',')[1],
+            nome: file.name
+        });
+        
+        fileInput.value = '';
+        document.getElementById(tipo + '-doc-desc').value = '';
+        atualizarListaDocumentos(tipo);
+        showMsg('✅ Documento adicionado');
+    };
+    reader.readAsDataURL(file);
+}
+
+// Atualizar Lista de Fotos
+function atualizarListaFotos(tipo) {
+    const listaDiv = document.getElementById(tipo + '-fotos-lista');
+    if (!listaDiv) return;
+    listaDiv.innerHTML = '';
+    
+    if (!fotosTemporarias[tipo]) return;
+    
+    fotosTemporarias[tipo].forEach((foto, index) => {
+        listaDiv.innerHTML += `
+            <div style="background: white; padding: 8px; margin: 5px 0; border-radius: 3px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>📷 ${foto.descricao}</strong>
+                    <small style="display: block; color: #666;">${foto.nome}</small>
+                </div>
+                <button type="button" onclick="removerFoto('${tipo}', ${index})" style="padding: 5px 10px; background: #ff6b6b; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">Remover</button>
+            </div>
+        `;
+    });
+}
+
+// Atualizar Lista de Documentos
+function atualizarListaDocumentos(tipo) {
+    const listaDiv = document.getElementById(tipo + '-docs-lista');
+    if (!listaDiv) return;
+    listaDiv.innerHTML = '';
+    
+    if (!documentosTemporarios[tipo]) return;
+    
+    documentosTemporarios[tipo].forEach((doc, index) => {
+        listaDiv.innerHTML += `
+            <div style="background: white; padding: 8px; margin: 5px 0; border-radius: 3px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>📄 ${doc.descricao}</strong>
+                    <small style="display: block; color: #666;">${doc.nome}</small>
+                </div>
+                <button type="button" onclick="removerDocumento('${tipo}', ${index})" style="padding: 5px 10px; background: #ff6b6b; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">Remover</button>
+            </div>
+        `;
+    });
+}
+
+// Remover Foto
+function removerFoto(tipo, index) {
+    if (fotosTemporarias[tipo]) {
+        fotosTemporarias[tipo].splice(index, 1);
+        atualizarListaFotos(tipo);
+    }
+}
+
+// Remover Documento
+function removerDocumento(tipo, index) {
+    if (documentosTemporarios[tipo]) {
+        documentosTemporarios[tipo].splice(index, 1);
+        atualizarListaDocumentos(tipo);
+    }
+}
+
+// Criar Subpasta
+async function criarSubpastaEquipamento(tipo, nomeEquipamento, pastaParentId) {
+    try {
+        // Montar nome da subpasta com padrão: tipo_nome
+        const nomeSubpasta = `${tipo}_${nomeEquipamento}`;
+        console.log(`📁 Criando subpasta: ${nomeSubpasta}`);
+        
+        const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                acao: 'criar-subpasta',
+                nomeSubpasta: nomeSubpasta,
+                pastaParentId: pastaParentId
+            }),
+            mode: 'cors'
+        });
+
+        console.log('Response status:', response.status);
+        const dados = await response.json();
+        console.log('📥 Response da API:', dados);
+        
+        if (dados.sucesso) {
+            console.log('✅ subpastaId retornada:', dados.subpastaId);
+            return dados.subpastaId;
+        } else {
+            console.error('❌ Erro na API:', dados.erro);
+            return null;
+        }
+    } catch (erro) {
+        console.error('❌ Erro ao criar subpasta:', erro.message);
+        return null;
+    }
+}
+
+// Upload de Foto
+async function uploadFoto(nomeArquivo, conteudoBase64, subpastaId) {
+    try {
+        console.log(`📤 uploadFoto: ${nomeArquivo}`);
+        console.log(`🆔 subpastaId: ${subpastaId}`);
+        console.log(`📊 Base64 length: ${conteudoBase64.length}`);
+        
+        const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                acao: 'upload-foto',
+                nomeArquivo: nomeArquivo,
+                conteudoBase64: conteudoBase64,
+                pastaId: subpastaId
+            }),
+            mode: 'cors'
+        });
+        
+        console.log('Response status:', response.status);
+        const resultado = await response.json();
+        console.log('📥 Response da API:', resultado);
+        
+        if (resultado.sucesso) {
+            console.log(`✅ Foto enviada: ${nomeArquivo}`);
+        } else {
+            console.error(`❌ Erro: ${resultado.erro}`);
+        }
+        return resultado;
+    } catch (erro) {
+        console.error('❌ Erro uploadFoto:', erro.message);
+        return { sucesso: false, erro: erro.message };
+    }
+}
+
+// Upload de Documento
+async function uploadDocumento(nomeArquivo, conteudoBase64, subpastaId) {
+    try {
+        console.log(`📤 uploadDocumento: ${nomeArquivo}`);
+        const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                acao: 'upload-documento',
+                nomeArquivo: nomeArquivo,
+                conteudoBase64: conteudoBase64,
+                pastaId: subpastaId
+            }),
+            mode: 'cors'
+        });
+        
+        const resultado = await response.json();
+        if (resultado.sucesso) {
+            console.log(`✅ Documento enviado: ${nomeArquivo}`);
+        } else {
+            console.error(`❌ Erro: ${resultado.erro}`);
+        }
+        return resultado;
+    } catch (erro) {
+        console.error('❌ Erro uploadDocumento:', erro.message);
+        return { sucesso: false, erro: erro.message };
+    }
+}
+
+// Salvar Equipamento V3 (com subpasta + uploads)
+async function salvarEquipamentoV3(tipo, obj) {
+    console.log('🔍 salvarEquipamentoV3 chamada:', tipo, obj.nome);
+    
+    // Se municipioAtual está vazio, tentar recuperar do localStorage
+    if (!municipioAtual) {
+        municipioAtual = localStorage.getItem('municipioAtual');
+        console.log('📝 municipioAtual recuperado do localStorage:', municipioAtual);
+    }
+    
+    console.log('municipioAtual:', municipioAtual);
+    console.log('pastasMunicipio:', pastasMunicipio);
+    
+    if (!municipioAtual || !pastasMunicipio[municipioAtual]) {
+        console.error('❌ ERRO: municipioAtual ou pasta não existem!');
+        console.log('municipioAtual:', municipioAtual, 'existe?', !!municipioAtual);
+        console.log('pastasMunicipio[municipioAtual]:', pastasMunicipio[municipioAtual]);
+        return;
+    }
+    
+    try {
+        const chaveSubpasta = `${municipioAtual}_${tipo}_${obj.id}`;
+        console.log('📝 chaveSubpasta:', chaveSubpasta);
+        let subpastasLocal = JSON.parse(localStorage.getItem('subpastasEquipamentos') || '{}');
+        let subpastaId = subpastasLocal[chaveSubpasta];
+        console.log('subpastaId encontrada:', subpastaId);
+        
+        // Criar subpasta se não existir
+        if (!subpastaId) {
+            console.log('📁 Criando subpasta...');
+            subpastaId = await criarSubpastaEquipamento(tipo, obj.nome, pastasMunicipio[municipioAtual]);
+            if (subpastaId) {
+                subpastasLocal[chaveSubpasta] = subpastaId;
+                localStorage.setItem('subpastasEquipamentos', JSON.stringify(subpastasLocal));
+                console.log('✅ Subpasta criada:', subpastaId);
+            }
+        }
+        
+        if (subpastaId) {
+            // Upload de fotos
+            if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
+                console.log('📷 Começando upload de', fotosTemporarias[tipo].length, 'fotos');
+                for (const foto of fotosTemporarias[tipo]) {
+                    console.log('📤 Uploadando foto:', foto.descricao);
+                    await uploadFoto(`${foto.descricao.replace(/\s+/g, '_')}_${Date.now()}.jpg`, foto.base64, subpastaId);
+                }
+                fotosTemporarias[tipo] = [];
+            } else {
+                console.log('ℹ️ Nenhuma foto para upload');
+            }
+            
+            // Upload de documentos
+            if (documentosTemporarios[tipo] && documentosTemporarios[tipo].length > 0) {
+                console.log('📄 Começando upload de', documentosTemporarios[tipo].length, 'documentos');
+                for (const doc of documentosTemporarios[tipo]) {
+                    console.log('📤 Uploadando doc:', doc.descricao);
+                    await uploadDocumento(`${doc.descricao.replace(/\s+/g, '_')}_${Date.now()}.pdf`, doc.base64, subpastaId);
+                }
+                documentosTemporarios[tipo] = [];
+            } else {
+                console.log('ℹ️ Nenhum documento para upload');
+            }
+        } else {
+            console.error('❌ Não conseguiu criar ou recuperar subpastaId');
+        }
+    } catch (erro) {
+        console.error('❌ Erro em salvarEquipamentoV3:', erro);
+    }
+}
+
+// ============================================================
+// FIM DAS FUNÇÕES V3.0
+// ============================================================
+
+// Carregar pastas existentes do localStorage
+function carregarPastasMunicipio() {
+    const pastas = localStorage.getItem('pastasMunicipio');
+    if (pastas) {
+        const pastasCarregadas = JSON.parse(pastas);
+        // ✅ Normalizar todas as chaves para minúsculas
+        pastasMunicipio = {};
+        for (const [chave, pastaId] of Object.entries(pastasCarregadas)) {
+            const chaveNormalizada = chave.toLowerCase().trim();
+            pastasMunicipio[chaveNormalizada] = pastaId;
+        }
+        console.log('✅ Pastas carregadas e normalizadas:', pastasMunicipio);
+    }
+}
+
+function saveMunicipio() {
+    const nome = document.getElementById('municipio-nome').value.trim();
+    const responsavel = document.getElementById('municipio-responsavel').value.trim();
+    
+    if (!nome || !responsavel) {
+        showMsgMunicipio('⚠️ Preencha Município e Responsável!');
+        return;
+    }
+    
+    // Gerar chave única do município (slug)
+    const chave = nome.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    
+    console.log('🏛️ Salvando município:', chave);
+    
+    // Verificar se município já existe
+    if (municipios[chave]) {
+        showMsgMunicipio('⚠️ Município já existe! Atualizando dados...');
+    }
+    
+    // Criar/atualizar estrutura do município
+    municipios[chave] = {
+        nome: nome,
+        responsavel: responsavel,
+        cargo: document.getElementById('municipio-cargo').value,
+        endereco: document.getElementById('municipio-endereco').value,
+        telefone: document.getElementById('municipio-telefone').value,
+        email: document.getElementById('municipio-email').value,
+        whatsapp: document.getElementById('municipio-whatsapp').value,
+        data: document.getElementById('municipio-data').value,
+        obs: document.getElementById('municipio-obs').value,
+        equipamentos: municipios[chave]?.equipamentos || {} // Preservar equipamentos existentes
+    };
+    
+    // Selecionar este município como atual
+    municipioAtual = chave;
+    localStorage.setItem('municipioAtual', chave); // ✅ Salvar no localStorage
+    dados = municipios[chave].equipamentos;
+    
+    // Salvar em localStorage
+    saveData();
+    
+    showMsgMunicipio('✓ Município salvo! Acesso aos menus liberado.');
+    
+    // CRIAR PASTA NO GOOGLE DRIVE AUTOMATICAMENTE
+    console.log('📁 Verificando se pasta existe para:', chave);
+    if (!pastasMunicipio[chave]) {
+        console.log('🔄 Criando pasta no Google Drive...');
+        showMsgMunicipio('⏳ Criando pasta no Google Drive...');
+        criarPastaMunicipio(nome).then(pastaId => {
+            console.log('📋 Resultado da criação:', pastaId);
+            if (pastaId) {
+                showMsgMunicipio('✅ Pasta criada no Drive!');
+                // Criar subpastas por tipo de equipamento
+                const tipos = ['Teatro', 'Auditório', 'Casa de Cultura', 'Praça', 'Biblioteca', 'Ginásio', 'Genérico'];
+                tipos.forEach(tipo => {
+                    // Aqui poderíamos criar subpastas, mas por enquanto tudo vai na pasta do município
+                });
+            }
+        }).catch(err => {
+            console.error('❌ Erro ao criar pasta:', err);
+        });
+    } else {
+        console.log('✅ Pasta já existe:', pastasMunicipio[chave]);
+    }
+    
+    // Compatibilidade legada
+    municipioData = municipios[chave];
+    localStorage.setItem('municipioData', JSON.stringify(municipioData));
+    
+    // Ir para menu após 1 segundo
+    setTimeout(() => {
+        atualizarDropdownMunicipios();
+        carregarDadosMunicipio();
+        mostrarAbasEquipamentos(); // MOSTRAR ABAS DE EQUIPAMENTOS
+        ocultarFormularioMunicipio(); // OCULTAR FORMULÁRIO
+        showTab('menu');
+        // ✅ ATUALIZAR INTERFACE APÓS CRIAR MUNICÍPIO
+        setTimeout(() => {
+            updateLists();
+            atualizarDropdownMunicipios();
+            console.log('✅ Interface atualizada após novo município');
+        }, 500);
+    }, 1000);
+}
+
+function showMsgMunicipio(msg) {
+    const msgDiv = document.getElementById('municipio-msg');
+    msgDiv.innerHTML = '<div class="msg">' + msg + '</div>';
+    setTimeout(() => {
+        msgDiv.innerHTML = '';
+    }, 3000);
+}
+
+function loadMunicipio() {
+    // Carregar dados na tela de edição de município
+    if (municipioAtual && municipios[municipioAtual]) {
+        const m = municipios[municipioAtual];
+        document.getElementById('municipio-nome').value = m.nome || '';
+        document.getElementById('municipio-responsavel').value = m.responsavel || '';
+        document.getElementById('municipio-cargo').value = m.cargo || '';
+        document.getElementById('municipio-endereco').value = m.endereco || '';
+        document.getElementById('municipio-telefone').value = m.telefone || '';
+        document.getElementById('municipio-email').value = m.email || '';
+        document.getElementById('municipio-whatsapp').value = m.whatsapp || '';
+        document.getElementById('municipio-data').value = m.data || '';
+        document.getElementById('municipio-obs').value = m.obs || '';
+    } else {
+        // Compatibilidade legada
+        const saved = localStorage.getItem('municipioData');
+        if (saved) {
+            municipioData = JSON.parse(saved);
+            document.getElementById('municipio-nome').value = municipioData.nome || '';
+            document.getElementById('municipio-responsavel').value = municipioData.responsavel || '';
+            document.getElementById('municipio-cargo').value = municipioData.cargo || '';
+            document.getElementById('municipio-endereco').value = municipioData.endereco || '';
+            document.getElementById('municipio-telefone').value = municipioData.telefone || '';
+            document.getElementById('municipio-email').value = municipioData.email || '';
+            document.getElementById('municipio-whatsapp').value = municipioData.whatsapp || '';
+            document.getElementById('municipio-data').value = municipioData.data || '';
+            document.getElementById('municipio-obs').value = municipioData.obs || '';
+        }
+    }
+}
+
+
+
+function atualizarDropdownMunicipios() {
+    // Atualizar seleção de municípios na aba 🏛️
+    const select = document.getElementById('municipio-select');
+    if (!select) return;
+    select.innerHTML = '';
+    Object.keys(municipios).forEach(chave => {
+        const opt = document.createElement('option');
+        opt.value = chave;
+        opt.textContent = municipios[chave].nome;
+        select.appendChild(opt);
+    });
+    if (municipioAtual) select.value = municipioAtual;
+}
+
+function carregarDadosMunicipio() {
+    // Carregar dados e equipamentos do município atual
+    if (municipioAtual && municipios[municipioAtual]) {
+        dados = municipios[municipioAtual].equipamentos;
+        municipioData = municipios[municipioAtual];
+        atualizarResumoPrincipal();
+        atualizarIndicadorMunicipio(); // ATUALIZAR INDICADOR
+    }
+}
+
+function carregarMunicipio() {
+    // Carregada quando usuário seleciona um município no dropdown
+    const select = document.getElementById('municipio-select');
+    if (!select) return;
+    const chave = select.value;
+    if (chave && municipios[chave]) {
+        municipioAtual = chave;
+        localStorage.setItem('municipioAtual', chave); // ✅ Salvar no localStorage
+        carregarDadosMunicipio();
+        loadMunicipio(); // Carregar dados na tela
+        atualizarResumoPrincipal();
+        updateLists();
+        mostrarAbasEquipamentos(); // MOSTRAR ABAS DE EQUIPAMENTOS
+        showTab('municipio'); // Mostrar aba com dados do município
+    }
+}
+
+function toggleCampos(id) {
+    const campos = document.getElementById(id + '-campos');
+    const sim = document.getElementById(id + '-sim');
+    const nao = document.getElementById(id + '-nao');
+    if (!campos) return;
+    if (nao && nao.checked) {
+        campos.classList.add('campos-desabilitados');
+        campos.querySelectorAll('input, select').forEach(e => e.disabled = true);
+        if (sim) sim.checked = false;
+    } else if (sim && sim.checked) {
+        campos.classList.remove('campos-desabilitados');
+        campos.querySelectorAll('input, select').forEach(e => e.disabled = false);
+        if (nao) nao.checked = false;
+    } else {
+        campos.classList.add('campos-desabilitados');
+        campos.querySelectorAll('input, select').forEach(e => e.disabled = true);
+    }
+}
+
+function loadData() {
+    // Carregar estrutura de municípios
+    const s = localStorage.getItem('municipios');
+    if (s) {
+        try {
+            municipios = JSON.parse(s);
+        } catch(e) {
+            console.warn('Erro ao carregar municipios:', e);
+            municipios = {};
+        }
+    }
+    
+    // Compatibilidade com dados antigos (espacos)
+    const old = localStorage.getItem('espacos');
+    if (old && Object.keys(municipios).length === 0) {
+        console.warn('Dados antigos detectados. Migrando...');
+        // Criar um município "Padrão" com dados antigos
+        municipios['padrao'] = {
+            nome: 'Padrão',
+            responsavel: '',
+            cargo: '',
+            endereco: '',
+            telefone: '',
+            email: '',
+            whatsapp: '',
+            data: '',
+            obs: '',
+            equipamentos: JSON.parse(old)
+        };
+        localStorage.removeItem('espacos');
+        saveData();
+    }
+    
+    // Se houver municípios, selecionar o primeiro
+    const chaves = Object.keys(municipios);
+    if (chaves.length > 0) {
+        municipioAtual = chaves[0];
+        localStorage.setItem('municipioAtual', municipioAtual); // ✅ Salvar no localStorage
+        carregarDadosMunicipio();
+        mostrarAbasEquipamentos(); // MOSTRAR ABAS
+    } else {
+        ocultarAbasEquipamentos(); // OCULTAR ABAS
+    }
+    
+    // Atualizar UI
+    atualizarDropdownMunicipios();
+    atualizarResumoPrincipal();
+    updateLists();
+}
+
+function saveData() {
+    // Salvar estrutura completa de municípios
+    localStorage.setItem('municipios', JSON.stringify(municipios));
+}
+
+function mostrarAbasEquipamentos() {
+    // Mostrar todas as abas de equipamentos quando um município é selecionado
+    const abas = [
+        'tab-menu-btn',
+        'tab-teatro-btn',
+        'tab-auditorio-btn',
+        'tab-casacultura-btn',
+        'tab-praca-btn',
+        'tab-biblioteca-btn',
+        'tab-ginasio-btn',
+        'tab-generico-btn'
+    ];
+    abas.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'inline-block'; // inline-block para flex container
+    });
+}
+
+function ocultarAbasEquipamentos() {
+    // Ocultar todas as abas de equipamentos quando não há município selecionado
+    const abas = [
+        'tab-menu-btn',
+        'tab-teatro-btn',
+        'tab-auditorio-btn',
+        'tab-casacultura-btn',
+        'tab-praca-btn',
+        'tab-biblioteca-btn',
+        'tab-ginasio-btn',
+        'tab-generico-btn'
+    ];
+    abas.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    
+    // Ocultar indicador de município
+    const indicador = document.getElementById('municipio-indicador');
+    if (indicador) indicador.style.display = 'none';
+}
+
+function atualizarIndicadorMunicipio() {
+    // Atualizar o indicador de qual município está selecionado
+    if (!municipioAtual || !municipios[municipioAtual]) {
+        const indicador = document.getElementById('municipio-indicador');
+        if (indicador) indicador.style.display = 'none';
+        return;
+    }
+    
+    const nomeMunicipio = municipios[municipioAtual].nome;
+    const indicador = document.getElementById('municipio-indicador');
+    const nomeSpan = document.getElementById('municipio-nome-indicador');
+    
+    if (indicador && nomeSpan) {
+        nomeSpan.textContent = nomeMunicipio;
+        indicador.style.display = 'block';
+    }
+}
+
+function showTab(t) {
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    document.getElementById(t).classList.add('active');
+}
+
+// ✅ NOVO: Função para limpar dados locais
+function limparDados() {
+    if (confirm('⚠️ ATENÇÃO: Isso vai DELETAR todos os dados locais!\n\nTem CERTEZA?')) {
+        if (confirm('🚨 ÚLTIMA CHANCE: Vai perder TUDO!\n\nConfirma mesmo?')) {
+            localStorage.clear();
+            alert('✅ Dados locais DELETADOS!\n\nPágina vai recarregar...');
+            location.reload();
+        }
+    }
+}
+
+function startForm(tipo) {
+    showTab(tipo);
+}
+
+function saveFormTeatro() {
+    const n = document.getElementById('teatro-nome').value;
+    if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
+    if (!dados.teatro) dados.teatro = [];
+    
+    // Se está editando, usar ID existente; senão criar novo
+    let obj = { id: equipamentoEmEdicao.tipo === 'teatro' ? equipamentoEmEdicao.id : Date.now(), nome: n };
+    document.querySelectorAll('#teatro input, #teatro textarea, #teatro select').forEach(el => {
+        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
+            obj[el.id.replace('teatro-', '')] = el.value;
+        }
+    });
+    
+    salvarTeatro(obj);
+}
+
+function salvarTeatro(obj) {
+    // Se está editando, atualizar; senão adicionar novo
+    if (equipamentoEmEdicao.tipo === 'teatro' && equipamentoEmEdicao.id) {
+        const indice = dados.teatro.findIndex(e => e.id === equipamentoEmEdicao.id);
+        if (indice >= 0) {
+            dados.teatro[indice] = obj;
+            showMsg('✓ Teatro atualizado com sucesso!');
+        } else {
+            dados.teatro.push(obj);
+            showMsg('✓ Teatro Salvo!');
+        }
+        equipamentoEmEdicao = { tipo: null, id: null };
+    } else {
+        dados.teatro.push(obj);
+        showMsg('✓ Teatro Salvo!');
+    }
+    
+    saveData();
+    updateLists();
+    document.querySelectorAll('#teatro input, #teatro textarea').forEach(el => el.value = '');
+    document.querySelectorAll('#teatro input[type="checkbox"]').forEach(el => el.checked = false);
+    document.querySelectorAll('[id^="teatro-"][id$="-campos"]').forEach(d => {
+        d.classList.add('campos-desabilitados');
+        d.querySelectorAll('input, select').forEach(e => e.disabled = true);
+    });
+    // V3.0: Salvar com subpasta + fotos + documentos
+    salvarEquipamentoV3('teatro', obj);
+    showTab('menu');
+}
+
+function saveFormAuditorio() {
+    const n = document.getElementById('auditorio-nome').value;
+    if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
+    if (!dados.auditorio) dados.auditorio = [];
+    
+    // Se está editando, usar ID existente; senão criar novo
+    let obj = { id: equipamentoEmEdicao.tipo === 'auditorio' ? equipamentoEmEdicao.id : Date.now(), nome: n };
+    document.querySelectorAll('#auditorio input, #auditorio textarea, #auditorio select').forEach(el => {
+        if (el.id) obj[el.id.replace('auditorio-', '')] = el.value;
+    });
+    
+    // Se está editando, atualizar; senão adicionar novo
+    if (equipamentoEmEdicao.tipo === 'auditorio' && equipamentoEmEdicao.id) {
+        const indice = dados.auditorio.findIndex(e => e.id === equipamentoEmEdicao.id);
+        if (indice >= 0) {
+            dados.auditorio[indice] = obj;
+            showMsg('✓ Auditório atualizado com sucesso!');
+        } else {
+            dados.auditorio.push(obj);
+            showMsg('✓ Auditório Salvo!');
+        }
+        equipamentoEmEdicao = { tipo: null, id: null };
+    } else {
+        dados.auditorio.push(obj);
+        showMsg('✓ Auditório Salvo!');
+    }
+    
+    saveData();
+    updateLists();
+    document.querySelectorAll('#auditorio input, #auditorio textarea').forEach(el => el.value = '');
+    document.querySelectorAll('#auditorio input[type="checkbox"]').forEach(el => el.checked = false);
+    document.querySelectorAll('[id^="auditorio-"][id$="-campos"]').forEach(d => {
+        d.classList.add('campos-desabilitados');
+        d.querySelectorAll('input, select').forEach(e => e.disabled = true);
+    });
+    // V3.0: Salvar com subpasta + fotos + documentos
+    salvarEquipamentoV3('auditorio', obj);
+    showTab('menu');
+}
+
+function saveFormCasaCultura() {
+    const n = document.getElementById('casacultura-nome').value;
+    if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
+    if (!dados.casacultura) dados.casacultura = [];
+    
+    // Se está editando, usar ID existente; senão criar novo
+    let obj = { id: equipamentoEmEdicao.tipo === 'casacultura' ? equipamentoEmEdicao.id : Date.now(), nome: n };
+    document.querySelectorAll('#casacultura input, #casacultura textarea, #casacultura select').forEach(el => {
+        if (el.id) obj[el.id.replace('casacultura-', '')] = el.value;
+    });
+    dados.casacultura.push(obj);
+    saveData();
+    updateLists();
+    showMsg('✓ Casa de Cultura Salva!');
+    document.querySelectorAll('#casacultura input, #casacultura textarea').forEach(el => el.value = '');
+    document.querySelectorAll('#casacultura input[type="checkbox"]').forEach(el => el.checked = false);
+    document.querySelectorAll('[id^="cc-"][id$="-campos"]').forEach(d => {
+        d.classList.add('campos-desabilitados');
+        d.querySelectorAll('input, select').forEach(e => e.disabled = true);
+    });
+    // V3.0: Salvar com subpasta + fotos + documentos
+    salvarEquipamentoV3('casacultura', obj);
+    showTab('menu');
+}
+
+function saveForm(tipo) {
+    const n = document.getElementById(tipo + '-nome').value;
+    if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
+    if (!dados[tipo]) dados[tipo] = [];
+    
+    // Se está editando, usar ID existente; senão criar novo
+    let obj = { id: equipamentoEmEdicao.tipo === tipo ? equipamentoEmEdicao.id : Date.now(), nome: n };
+    document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
+        if (el.id) obj[el.id.replace(tipo + '-', '')] = el.value;
+    });
+    
+    // Se está editando, atualizar; senão adicionar novo
+    if (equipamentoEmEdicao.tipo === tipo && equipamentoEmEdicao.id) {
+        const indice = dados[tipo].findIndex(e => e.id === equipamentoEmEdicao.id);
+        if (indice >= 0) {
+            dados[tipo][indice] = obj;
+            showMsg('✓ Equipamento atualizado com sucesso!');
+        } else {
+            dados[tipo].push(obj);
+            showMsg('✓ Salvo!');
+        }
+        equipamentoEmEdicao = { tipo: null, id: null };
+    } else {
+        dados[tipo].push(obj);
+        showMsg('✓ Salvo!');
+    }
+    
+    saveData();
+    updateLists();
+    document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea').forEach(el => el.value = '');
+    // V3.0: Salvar com subpasta + fotos + documentos
+    salvarEquipamentoV3(tipo, obj);
+    showTab('menu');
+}
+
+function saveFormGenerico() {
+    const n = document.getElementById('generico-nome').value;
+    if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
+    if (!dados.generico) dados.generico = [];
+    
+    // Se está editando, usar ID existente; senão criar novo
+    let obj = { id: equipamentoEmEdicao.tipo === 'generico' ? equipamentoEmEdicao.id : Date.now(), nome: n };
+    document.querySelectorAll('#generico input, #generico textarea, #generico select').forEach(el => {
+        if (el.id) obj[el.id.replace('generico-', '')] = el.value;
+    });
+    
+    // Se está editando, atualizar; senão adicionar novo
+    if (equipamentoEmEdicao.tipo === 'generico' && equipamentoEmEdicao.id) {
+        const indice = dados.generico.findIndex(e => e.id === equipamentoEmEdicao.id);
+        if (indice >= 0) {
+            dados.generico[indice] = obj;
+            showMsg('✓ Espaço Genérico atualizado com sucesso!');
+        } else {
+            dados.generico.push(obj);
+            showMsg('✓ Espaço Genérico Salvo!');
+        }
+        equipamentoEmEdicao = { tipo: null, id: null };
+    } else {
+        dados.generico.push(obj);
+        showMsg('✓ Espaço Genérico Salvo!');
+    }
+    
+    saveData();
+    updateLists();
+    document.querySelectorAll('#generico input, #generico textarea').forEach(el => el.value = '');
+    document.querySelectorAll('#generico select').forEach(el => el.selectedIndex = 0);
+    document.querySelectorAll('#generico input[type="checkbox"]').forEach(el => el.checked = false);
+    document.querySelectorAll('[id^="generico-"][id$="-campos"]').forEach(d => {
+        d.classList.add('campos-desabilitados');
+        d.querySelectorAll('input, select').forEach(e => e.disabled = true);
+    });
+    // V3.0: Salvar com subpasta + fotos + documentos
+    salvarEquipamentoV3('generico', obj);
+    showTab('menu');
+}
+
+function updateLists() {
+    ['teatro', 'auditorio', 'casacultura', 'praca', 'biblioteca', 'ginasio', 'generico'].forEach(t => {
+        const c = (dados[t] || []).length;
+        const countEl = document.getElementById(t + '-count');
+        if (countEl) countEl.textContent = c;
+        const l = document.getElementById(t + '-lista');
+        if (!l) return;
+        l.innerHTML = '';
+        (dados[t] || []).forEach(e => {
+            const div = document.createElement('div');
+            div.className = 'item';
+            const span = document.createElement('span');
+            span.innerHTML = '<b>' + e.nome + '</b>';
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-danger';
+            btn.textContent = '🗑';
+            btn.style.marginLeft = '10px';
+            btn.style.padding = '5px 10px';
+            btn.style.width = 'auto';
+            btn.type = 'button';
+            btn.addEventListener('click', function(ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                console.log('Clicou em deletar:', t, e.id, e.nome);
+                // Recuperar pastaId da subpasta para deletar do Drive
+                const chaveSubpasta = `${municipioAtual}_${t}_${e.id}`;
+                let subpastasLocal = JSON.parse(localStorage.getItem('subpastasEquipamentos') || '{}');
+                const pastaId = subpastasLocal[chaveSubpasta];
+                console.log('🗑️ pastaId recuperada:', pastaId);
+                abrirModalConfirmar('equipamento', t, e.id, e.nome, pastaId);
+            });
+            
+            // BOTÃO EDITAR
+            const btnEditar = document.createElement('button');
+            btnEditar.className = 'btn btn-primary';
+            btnEditar.textContent = '✏️';
+            btnEditar.style.marginLeft = '5px';
+            btnEditar.style.padding = '5px 10px';
+            btnEditar.style.width = 'auto';
+            btnEditar.type = 'button';
+            btnEditar.addEventListener('click', function(ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                console.log('Clicou em editar:', t, e.id, e.nome);
+                editarEspaco(t, e.id);
+            });
+            
+            div.appendChild(span);
+            div.appendChild(btnEditar);
+            div.appendChild(btn);
+            l.appendChild(div);
+        });
+    });
+}
+
+function editarEspaco(tipo, id) {
+    // Carregar dados do equipamento no formulário
+    if (!municipioAtual || !municipios[municipioAtual]) {
+        showMsg('⚠️ Nenhum município selecionado!');
+        return;
+    }
+    
+    if (!municipios[municipioAtual].equipamentos[tipo]) {
+        showMsg('⚠️ Tipo de equipamento não encontrado');
+        return;
+    }
+    
+    // Encontrar equipamento
+    const equipamento = municipios[municipioAtual].equipamentos[tipo].find(e => e.id === id);
+    if (!equipamento) {
+        showMsg('⚠️ Equipamento não encontrado');
+        return;
+    }
+    
+    // Marcar que estamos em modo edição
+    equipamentoEmEdicao = { tipo: tipo, id: id };
+    console.log('Editando equipamento:', tipo, id, equipamento);
+    
+    // Carregar todos os campos no formulário
+    Object.keys(equipamento).forEach(chave => {
+        if (chave === 'id' || chave === 'nome') return;
+        const fieldId = tipo + '-' + chave;
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.value = equipamento[chave] || '';
+            field.disabled = false;
+        }
+    });
+    
+    // Carregar nome
+    const nomeField = document.getElementById(tipo + '-nome');
+    if (nomeField) {
+        nomeField.value = equipamento.nome || '';
+        nomeField.disabled = false;
+    }
+    
+    // Ir para aba do formulário
+    showTab(tipo);
+    showMsg('✓ Equipamento carregado para edição');
+}
+
+function deleteEspaco(t, id) {
+    // Deletar APENAS do municipioAtual
+    if (!municipioAtual || !municipios[municipioAtual]) {
+        showMsg('⚠️ Erro: município não selecionado');
+        return;
+    }
+    
+    if (!municipios[municipioAtual].equipamentos[t]) {
+        showMsg('⚠️ Erro: tipo de equipamento não encontrado');
+        return;
+    }
+    
+    // Verificar se o equipamento existe
+    const existente = municipios[municipioAtual].equipamentos[t].some(e => e.id === id);
+    if (!existente) {
+        showMsg('⚠️ Erro: equipamento não encontrado');
+        return;
+    }
+    
+    if (confirm('Deletar este equipamento? Esta ação não pode ser desfeita.')) {
+        municipios[municipioAtual].equipamentos[t] = municipios[municipioAtual].equipamentos[t].filter(e => e.id !== id);
+        dados = municipios[municipioAtual].equipamentos;
+        saveData();
+        updateLists();
+        showMsg('✓ Equipamento deletado!');
+    }
+}
+
+function showMsg(t) {
+    document.getElementById('msg').innerHTML = '<div class="msg">' + t + '</div>';
+    setTimeout(() => { document.getElementById('msg').innerHTML = ''; }, 2500);
+}
+
+function exportJSON() {
+    // Exportar município COMPLETO com seus equipamentos
+    if (!municipioAtual || !municipios[municipioAtual]) {
+        showMsg('⚠️ Nenhum município selecionado!');
+        return;
+    }
+    
+    const jsonData = municipios[municipioAtual];
+    const json = JSON.stringify(jsonData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const nomeArquivo = municipioAtual ? `rider-${municipioAtual}.json` : 'rider-tecnico.json';
+    a.download = nomeArquivo;
+    a.click();
+    showMsg('📥 Exportado: ' + nomeArquivo);
+}
+
+function deletarMunicipio() {
+    const select = document.getElementById('municipio-select');
+    const chave = select ? select.value : municipioAtual;
+    
+    if (!chave || !municipios[chave]) {
+        showMsg('⚠️ Nenhum município selecionado!');
+        return;
+    }
+    
+    const nome = municipios[chave].nome;
+    console.log('Deletando município:', chave, nome);
+    // Passar chave como param1 e nome como param3 para exibição
+    abrirModalConfirmar('municipio', chave, null, nome);
+}
+
+function cancelarEdicao() {
+    equipamentoEmEdicao = { tipo: null, id: null };
+    showMsg('⚠️ Edição cancelada');
+    showTab('menu');
+}
+
+function limparFormularioMunicipio() {
+    document.getElementById('municipio-nome').value = '';
+    document.getElementById('municipio-responsavel').value = '';
+    document.getElementById('municipio-cargo').value = '';
+    document.getElementById('municipio-endereco').value = '';
+    document.getElementById('municipio-telefone').value = '';
+    document.getElementById('municipio-email').value = '';
+    document.getElementById('municipio-whatsapp').value = '';
+    document.getElementById('municipio-data').value = '';
+    document.getElementById('municipio-obs').value = '';
+    document.getElementById('municipio-select').value = '';
+    document.getElementById('resumo-municipio').style.display = 'none';
+    
+    // Mostrar formulário de novo município
+    const formulario = document.getElementById('formulario-novo-municipio');
+    if (formulario) formulario.style.display = 'block';
+}
+
+function ocultarFormularioMunicipio() {
+    // Ocultar formulário de novo município
+    const formulario = document.getElementById('formulario-novo-municipio');
+    if (formulario) formulario.style.display = 'none';
+    
+    // Limpar campos
+    document.getElementById('municipio-nome').value = '';
+    document.getElementById('municipio-responsavel').value = '';
+    document.getElementById('municipio-cargo').value = '';
+    document.getElementById('municipio-endereco').value = '';
+    document.getElementById('municipio-telefone').value = '';
+    document.getElementById('municipio-email').value = '';
+    document.getElementById('municipio-whatsapp').value = '';
+    document.getElementById('municipio-data').value = '';
+    document.getElementById('municipio-obs').value = '';
+}
+
+function atualizarResumoPrincipal() {
+    // Atualizar o resumo de dados do município selecionado
+    if (municipioAtual && municipios[municipioAtual]) {
+        const m = municipios[municipioAtual];
+        document.getElementById('resumo-nome').textContent = m.nome || '—';
+        document.getElementById('resumo-responsavel').textContent = m.responsavel || '—';
+        document.getElementById('resumo-cargo').textContent = m.cargo || '—';
+        document.getElementById('resumo-email').textContent = m.email || '—';
+        document.getElementById('resumo-telefone').textContent = m.telefone || '—';
+        document.getElementById('resumo-whatsapp').textContent = m.whatsapp || '—';
+        document.getElementById('resumo-municipio').style.display = 'block';
+    } else {
+        document.getElementById('resumo-municipio').style.display = 'none';
+    }
+}
+
+
+// ========== SISTEMA DE MODAL DE CONFIRMAÇÃO ==========
+let equipamentoEmEdicao = { tipo: null, id: null };
+
+let modalDados = { tipo: null, param1: null, param2: null, param3: null, pastaId: null };
+let modalEmSegundoNivel = false; // Rastrear se já passou do primeiro aviso
+
+function abrirModalConfirmar(tipo, param1, param2, param3, pastaId = null) {
+    console.log('Abrindo modal:', tipo, param1, param2, param3, 'pastaId:', pastaId);
+    modalDados = { tipo: tipo, param1: param1, param2: param2, param3: param3, pastaId: pastaId };
+    const modal = document.getElementById('modal-confirmar');
+    const titulo = document.getElementById('modal-titulo');
+    const mensagem = document.getElementById('modal-mensagem');
+    
+    if (tipo === 'equipamento') {
+        titulo.textContent = 'Deletar Equipamento';
+        mensagem.textContent = 'Tem certeza que deseja deletar o equipamento "' + param3 + '"? Esta ação não pode ser desfeita.';
+    } else if (tipo === 'municipio') {
+        titulo.textContent = 'Deletar Município';
+        // param1 é a chave, param3 é o nome
+        mensagem.textContent = 'Tem certeza que deseja deletar o município "' + param3 + '" e TODOS os seus equipamentos? Esta ação não pode ser desfeita.';
+    }
+    
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function fecharModal() {
+    const modal = document.getElementById('modal-confirmar');
+    const modalFinal = document.getElementById('modal-confirmar-final');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    if (modalFinal) {
+        modalFinal.style.display = 'none';
+    }
+    modalDados = { tipo: null, param1: null, param2: null, param3: null, pastaId: null };
+    modalEmSegundoNivel = false;
+}
+
+// NOVO: Mostrar segundo modal (confirmação final)
+function mostrarModalFinal() {
+    const modalFinal = document.getElementById('modal-confirmar-final');
+    const mensagemFinal = document.getElementById('modal-final-mensagem');
+    
+    if (modalDados.tipo === 'equipamento') {
+        mensagemFinal.textContent = 'Tem certeza absoluta que deseja deletar "' + modalDados.param3 + '" e TODOS os seus arquivos do Google Drive? Esta ação é IRREVERSÍVEL!';
+    } else if (modalDados.tipo === 'municipio') {
+        mensagemFinal.textContent = 'Tem certeza absoluta que deseja deletar o município "' + modalDados.param3 + '", TODOS OS EQUIPAMENTOS e TODOS OS ARQUIVOS do Google Drive? Esta ação é IRREVERSÍVEL!';
+    }
+    
+    if (modalFinal) {
+        modalFinal.style.display = 'flex';
+    }
+}
+
+function confirmarDelete() {
+    console.log('Confirmando delete:', modalDados);
+    
+    // Se não passou do primeiro aviso, mostrar segundo aviso
+    if (!modalEmSegundoNivel) {
+        modalEmSegundoNivel = true;
+        mostrarModalFinal();
+        return;
+    }
+    
+    // Se passou para segundo aviso, efetuar a deleção
+    if (modalDados.tipo === 'equipamento') {
+        deleteEspacoConfirmado(modalDados.param1, modalDados.param2);
+    } else if (modalDados.tipo === 'municipio') {
+        deletarMunicipioConfirmado(modalDados.param1);
+    }
+    fecharModal();
+}
+
+async function deleteEspacoConfirmado(t, id) {
+    console.log('Deletando equipamento:', t, id);
+    if (!municipioAtual || !municipios[municipioAtual]) {
+        showMsg('⚠️ Nenhum município selecionado!');
+        return;
+    }
+    
+    if (!municipios[municipioAtual].equipamentos[t]) {
+        showMsg('⚠️ Tipo de equipamento não encontrado');
+        return;
+    }
+    
+    const existente = municipios[municipioAtual].equipamentos[t].find(e => e.id === id);
+    if (!existente) {
+        showMsg('⚠️ Equipamento não encontrado');
+        return;
+    }
+    
+    // ✅ NOVO: Deletar do Google Drive também
+    if (modalDados.pastaId) {
+        console.log('🗑️ Deletando pasta do Google Drive:', modalDados.pastaId);
+        try {
+            const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    acao: 'deletar-pasta',
+                    pastaId: modalDados.pastaId
+                }),
+                mode: 'cors'
+            });
+
+            const resultado = await response.json();
+            if (resultado.sucesso) {
+                console.log('✅ Pasta deletada do Google Drive');
+            } else {
+                console.error('❌ Erro ao deletar pasta:', resultado.erro);
+                showMsg('⚠️ Aviso: Equipamento deletado localmente, mas houve erro ao deletar no Google Drive');
+            }
+        } catch (erro) {
+            console.error('❌ Erro ao conectar com servidor:', erro);
+            showMsg('⚠️ Aviso: Equipamento deletado localmente, mas houve erro ao deletar no Google Drive');
+        }
+    }
+    
+    // Deletar do localStorage
+    municipios[municipioAtual].equipamentos[t] = 
+        municipios[municipioAtual].equipamentos[t].filter(e => e.id !== id);
+    dados = municipios[municipioAtual].equipamentos;
+    saveData();
+    updateLists();
+    showMsg('✓ Equipamento deletado com sucesso (local e Google Drive)!');
+}
+
+async function deletarMunicipioConfirmado(chave) {
+    console.log('Deletando município:', chave);
+    if (!chave || !municipios[chave]) {
+        showMsg('⚠️ Município não encontrado');
+        return;
+    }
+    
+    // ✅ Normalizar chave para minúsculas
+    const chaveMunicipio = chave.toLowerCase().trim();
+    
+    // ✅ NOVO: Deletar a pasta do município do Google Drive
+    if (pastasMunicipio[chaveMunicipio]) {
+        const pastaId = pastasMunicipio[chaveMunicipio];
+        console.log('🗑️ Deletando pasta do município do Google Drive:', pastaId);
+        try {
+            const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    acao: 'deletar-pasta',
+                    pastaId: pastaId
+                }),
+                mode: 'cors'
+            });
+
+            const resultado = await response.json();
+            if (resultado.sucesso) {
+                console.log('✅ Pasta do município deletada do Google Drive');
+            } else {
+                console.error('❌ Erro ao deletar pasta do município:', resultado.erro);
+            }
+        } catch (erro) {
+            console.error('❌ Erro ao conectar com servidor:', erro);
+        }
+    }
+    
+    // Deletar do localStorage
+    delete municipios[chave];
+    delete pastasMunicipio[chaveMunicipio];
+    localStorage.setItem('pastasMunicipio', JSON.stringify(pastasMunicipio));
+    saveData();
+    municipioAtual = null;
+    dados = {};
+    limparFormularioMunicipio();
+    atualizarDropdownMunicipios();
+    const resumo = document.getElementById('resumo-municipio');
+    if (resumo) resumo.style.display = 'none';
+    showMsg('✓ Município deletado com sucesso (local e Google Drive)!');
+}
+
+// Aguardar DOM estar pronto antes de carregar dados
+document.addEventListener('DOMContentLoaded', function() {
+    // ===== INICIALIZAÇÃO: Carregar dados do localStorage =====
+    loadMunicipio();
+    loadData();
+    carregarPastasMunicipio(); // Carregar pastas do Google Drive
+    
+    // ===== EVENT LISTENERS DOS BOTÕES DO MODAL =====
+    const btnCancelar = document.getElementById('modal-cancelar');
+    const btnConfirmar = document.getElementById('modal-confirmar-btn');
+    
+    if (btnCancelar) {
+        btnCancelar.addEventListener('click', function() {
+            console.log('Cancelar clicado');
+            fecharModal();
+        });
+    }
+    
+    if (btnConfirmar) {
+        btnConfirmar.addEventListener('click', function() {
+            console.log('Confirmar clicado');
+            confirmarDelete();
+        });
     }
 
-    return res.status(400).json({
-      sucesso: false,
-      erro: 'Ação não reconhecida',
-    });
-  } catch (error) {
-    console.error('[API] Erro:', error);
-    return res.status(500).json({
-      sucesso: false,
-      erro: error.message || 'Erro interno do servidor',
-      detalhes: error.toString(),
-    });
-  }
-};
+    // ✅ NOVO: Event listeners para o segundo modal (duplo aviso)
+    const btnFinalConfirmar = document.getElementById('modal-final-confirmar-btn');
+    const btnFinalCancelar = document.getElementById('modal-final-cancelar');
+    
+    if (btnFinalConfirmar) {
+        btnFinalConfirmar.addEventListener('click', function() {
+            console.log('Confirmação final clicada');
+            if (modalDados.tipo === 'equipamento') {
+                deleteEspacoConfirmado(modalDados.param1, modalDados.param2);
+                // ✅ ATUALIZAR INTERFACE APÓS DELETAR EQUIPAMENTO
+                setTimeout(() => {
+                    updateLists();
+                    console.log('✅ Interface atualizada após deletar equipamento');
+                }, 300);
+            } else if (modalDados.tipo === 'municipio') {
+                deletarMunicipioConfirmado(modalDados.param1);
+                // ✅ ATUALIZAR INTERFACE APÓS DELETAR MUNICÍPIO
+                setTimeout(() => {
+                    atualizarDropdownMunicipios();
+                    console.log('✅ Interface atualizada após deletar município');
+                }, 300);
+            }
+            fecharModal();
+        });
+    }
+    
+    if (btnFinalCancelar) {
+        btnFinalCancelar.addEventListener('click', function() {
+            console.log('Cancelamento final clicado');
+            fecharModal();
+        });
+    }
+});
+// (necessário porque o ambiente bloqueia handlers inline)
+function __dispatch(call, el) {
+    if (!call) return;
+    var m = call.match(/^\s*([A-Za-z_$][\w$]*)\s*\((.*)\)\s*$/);
+    if (!m) {
+        if (typeof window[call] === 'function') { window[call].call(el); }
+        return;
+    }
+    var fn = window[m[1]];
+    if (typeof fn !== 'function') { return; }
+    var argsStr = m[2].trim();
+    var args = [];
+    if (argsStr) {
+        var parts = argsStr.match(/'[^']*'|"[^"]*"|[^,]+/g) || [];
+        args = parts.map(function(a) {
+            a = a.trim();
+            if ((a.charAt(0) === "'" && a.charAt(a.length - 1) === "'") ||
+                (a.charAt(0) === '"' && a.charAt(a.length - 1) === '"')) {
+                return a.slice(1, -1);
+            }
+            if (a === 'true') return true;
+            if (a === 'false') return false;
+            var n = Number(a);
+            return (a !== '' && !isNaN(n)) ? n : a;
+        });
+    }
+    fn.apply(el, args);
+}
+
+document.addEventListener('click', function(e) {
+    var el = e.target.closest('[data-onclick]');
+    if (el) { __dispatch(el.getAttribute('data-onclick'), el); }
+});
+
+document.addEventListener('change', function(e) {
+    var el = e.target;
+    if (el && el.hasAttribute && el.hasAttribute('data-onchange')) {
+        __dispatch(el.getAttribute('data-onchange'), el);
+    }
+});
+
+</script>
+
+<!-- MODAL DE CONFIRMAÇÃO DE DELETE -->
+<div id="modal-confirmar" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:white; padding:30px; border-radius:12px; max-width:400px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+        <h3 style="margin-top:0; color:#333;" id="modal-titulo">⚠️ Confirmar Exclusão</h3>
+        <p style="color:#666; margin:15px 0;" id="modal-mensagem">Tem certeza que deseja deletar este item?</p>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button id="modal-cancelar" style="flex:1; padding:10px; background:#999; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Cancelar</button>
+            <button id="modal-confirmar-btn" style="flex:1; padding:10px; background:#dc3545; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Continuar</button>
+        </div>
+    </div>
+</div>
+
+<!-- SEGUNDO MODAL - Confirmação Final (Duplo Aviso) -->
+<div id="modal-confirmar-final" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:10001; align-items:center; justify-content:center;">
+    <div style="background:#fff3cd; padding:40px; border-radius:10px; max-width:450px; box-shadow:0 4px 30px rgba(0,0,0,0.4); border: 3px solid #ff6b6b;">
+        <h2 style="margin-top:0; color:#cc0000; text-align:center;">🔴 ÚLTIMA CHANCE!</h2>
+        <p style="color:#333; margin:20px 0; font-size:16px; line-height:1.6;" id="modal-final-mensagem">Esta ação é IRREVERSÍVEL!</p>
+        <div style="background:#ffcccc; padding:15px; border-radius:6px; margin:20px 0; border-left: 4px solid #ff0000;">
+            <p style="margin:5px 0; font-weight:bold; color:#cc0000;">⚠️ Será deletado:</p>
+            <ul style="margin:10px 0; padding-left:20px; color:#666;">
+                <li>O equipamento/município</li>
+                <li>Todas as fotos</li>
+                <li>Todos os documentos</li>
+                <li>A pasta no Google Drive</li>
+            </ul>
+        </div>
+        <p style="color:#cc0000; font-weight:bold; text-align:center; margin:20px 0;">Confirme novamente se tem certeza absoluta:</p>
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button id="modal-final-cancelar" style="flex:1; padding:12px; background:#999; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Não, Cancelar</button>
+            <button id="modal-final-confirmar-btn" style="flex:1; padding:12px; background:#cc0000; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">SIM, DELETAR PARA SEMPRE</button>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
