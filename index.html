@@ -5160,38 +5160,47 @@ function editarEspaco(tipo, id) {
         return;
     }
     
-    // Encontrar equipamento
-    const equipamento = municipios[municipioAtual].equipamentos[tipo].find(e => e.id === id);
+    // Encontrar equipamento - usando comparação correta de ID
+    const equipamento = municipios[municipioAtual].equipamentos[tipo].find(e => e.id == id);
     if (!equipamento) {
+        console.error('❌ Equipamento não encontrado!', tipo, id);
+        console.log('📋 Equipamentos disponíveis:', municipios[municipioAtual].equipamentos[tipo]);
         showMsg('⚠️ Equipamento não encontrado');
         return;
     }
     
     // Marcar que estamos em modo edição
     equipamentoEmEdicao = { tipo: tipo, id: id };
-    console.log('Editando equipamento:', tipo, id, equipamento);
+    console.log('✏️ Editando equipamento:', tipo, id, equipamento);
+    
+    // Limpar formulário antes de carregar
+    document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
+        if (el.type === 'checkbox' || el.type === 'radio') {
+            el.checked = false;
+        } else {
+            el.value = '';
+        }
+        el.disabled = false;
+    });
     
     // Carregar todos os campos no formulário
     Object.keys(equipamento).forEach(chave => {
-        if (chave === 'id' || chave === 'nome') return;
+        if (chave === 'id') return;
         const fieldId = tipo + '-' + chave;
         const field = document.getElementById(fieldId);
         if (field) {
-            field.value = equipamento[chave] || '';
+            if (field.type === 'checkbox') {
+                field.checked = equipamento[chave] === true || equipamento[chave] === 'true';
+            } else {
+                field.value = equipamento[chave] || '';
+            }
             field.disabled = false;
         }
     });
     
-    // Carregar nome
-    const nomeField = document.getElementById(tipo + '-nome');
-    if (nomeField) {
-        nomeField.value = equipamento.nome || '';
-        nomeField.disabled = false;
-    }
-    
     // Ir para aba do formulário
     showTab(tipo);
-    showMsg('✓ Equipamento carregado para edição');
+    showMsg('✓ ' + equipamento.nome + ' carregado para edição');
 }
 
 function deleteEspaco(t, id) {
