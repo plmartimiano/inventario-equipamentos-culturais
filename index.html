@@ -59,6 +59,8 @@
         .checkbox-item label { margin: 0; font-size: 13px; font-weight: 700; cursor: pointer; }
         .campos-desabilitados { opacity: 0.5; pointer-events: none; }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -4509,6 +4511,141 @@ async function uploadDocumento(nomeArquivo, conteudoBase64, subpastaId) {
     }
 }
 
+// ============================================================
+// GERAR RELATÓRIO PDF
+// ============================================================
+async function gerarRelatorioPDF(tipo, obj, subpastaId) {
+    try {
+        console.log('📄 Gerando relatório PDF para:', tipo, obj.nome);
+        
+        // Formatar data e hora
+        const agora = new Date();
+        const dia = String(agora.getDate()).padStart(2, '0');
+        const mes = String(agora.getMonth() + 1).padStart(2, '0');
+        const ano = agora.getFullYear();
+        const horas = String(agora.getHours()).padStart(2, '0');
+        const minutos = String(agora.getMinutes()).padStart(2, '0');
+        const segundos = String(agora.getSeconds()).padStart(2, '0');
+        
+        const dataHora = `${dia}_${mes}_${ano}_${horas}h${minutos}m${segundos}s`;
+        const nomePDF = `${tipo}_${obj.nome.replace(/\s+/g, '_')}_${dataHora}.pdf`;
+        
+        // Criar HTML do relatório
+        let htmlRelatorio = `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px;">
+                <h1 style="text-align: center; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">
+                    📋 Relatório - ${tipo.toUpperCase()}
+                </h1>
+                
+                <div style="margin: 20px 0; background: #f5f5f5; padding: 15px; border-radius: 5px;">
+                    <h2 style="color: #667eea; margin-top: 0;">📌 Identificação</h2>
+                    <p><strong>Nome:</strong> ${obj.nome || 'N/A'}</p>
+                    <p><strong>Data do Relatório:</strong> ${dia}/${mes}/${ano} às ${horas}:${minutos}:${segundos}</p>
+        `;
+        
+        // Adicionar campos do equipamento
+        Object.keys(obj).forEach(chave => {
+            if (['id', 'nome'].includes(chave)) return;
+            if (!obj[chave] || obj[chave] === '' || obj[chave] === 'N/A') return;
+            
+            const nomeFormatado = chave.replace(/_/g, ' ').toUpperCase();
+            const valor = obj[chave];
+            
+            htmlRelatorio += `<p><strong>${nomeFormatado}:</strong> ${valor}</p>`;
+        });
+        
+        htmlRelatorio += `</div>`;
+        
+        // Adicionar fotos
+        if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
+            htmlRelatorio += `
+                <div style="margin: 20px 0;">
+                    <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px;">📷 Fotos</h2>
+            `;
+            
+            fotosTemporarias[tipo].forEach((foto, index) => {
+                htmlRelatorio += `
+                    <div style="margin: 15px 0; page-break-inside: avoid;">
+                        <h3 style="color: #555; margin: 10px 0 5px 0;">Foto ${index + 1}: ${foto.descricao}</h3>
+                        <img src="data:image/jpeg;base64,${foto.base64}" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                `;
+            });
+            
+            htmlRelatorio += `</div>`;
+        }
+        
+        htmlRelatorio += `
+            </div>
+        `;
+        
+        // Gerar PDF usando html2pdf
+        const element = document.createElement('div');
+        element.innerHTML = htmlRelatorio;
+        
+        const opt = {
+            margin: 10,
+            filename: nomePDF,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+        };
+        
+        // Gerar PDF
+        return new Promise((resolve) => {
+            html2pdf().set(opt).from(element).toPdf().get('pdf').then((pdf) => {
+                // Converter PDF para base64
+                const pdfBase64 = pdf.output('dataurlstring').split(',')[1];
+                console.log('✅ PDF gerado com sucesso');
+                
+                // Upload do PDF para Google Drive
+                uploadPDF(nomePDF, pdfBase64, subpastaId).then(resultado => {
+                    console.log('📤 PDF enviado para Google Drive:', nomePDF);
+                    resolve(resultado);
+                });
+            }).catch(err => {
+                console.error('❌ Erro ao gerar PDF:', err);
+                resolve({ sucesso: false, erro: err.message });
+            });
+        });
+    } catch (erro) {
+        console.error('❌ Erro em gerarRelatorioPDF:', erro.message);
+        return { sucesso: false, erro: erro.message };
+    }
+}
+
+// Upload do PDF para Google Drive
+async function uploadPDF(nomeArquivo, conteudoBase64, subpastaId) {
+    try {
+        console.log(`📤 uploadPDF: ${nomeArquivo}`);
+        const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                acao: 'upload-documento',
+                nomeArquivo: nomeArquivo,
+                conteudoBase64: conteudoBase64,
+                pastaId: subpastaId
+            }),
+            mode: 'cors'
+        });
+        
+        const resultado = await response.json();
+        if (resultado.sucesso) {
+            console.log(`✅ PDF enviado: ${nomeArquivo}`);
+        } else {
+            console.error(`❌ Erro: ${resultado.erro}`);
+        }
+        return resultado;
+    } catch (erro) {
+        console.error('❌ Erro uploadPDF:', erro.message);
+        return { sucesso: false, erro: erro.message };
+    }
+}
+
 // Salvar Equipamento V3 (com subpasta + uploads)
 async function salvarEquipamentoV3(tipo, obj) {
     console.log('🔍 salvarEquipamentoV3 chamada:', tipo, obj.nome);
@@ -4571,6 +4708,10 @@ async function salvarEquipamentoV3(tipo, obj) {
             } else {
                 console.log('ℹ️ Nenhum documento para upload');
             }
+            
+            // ✅ GERAR RELATÓRIO PDF
+            console.log('📄 Gerando relatório PDF...');
+            await gerarRelatorioPDF(tipo, obj, subpastaId);
         } else {
             console.error('❌ Não conseguiu criar ou recuperar subpastaId');
         }
