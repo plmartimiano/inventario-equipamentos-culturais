@@ -5150,30 +5150,6 @@ function showTab(t) {
 }
 
 function startForm(tipo) {
-    // ✅ CORREÇÃO: Limpar formulário antes de mostrar novo
-    equipamentoEmEdicao = { tipo: null, id: null };
-    
-    // Limpar todos os campos do formulário
-    document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
-        if (el.type === 'checkbox' || el.type === 'radio') {
-            el.checked = false;
-        } else {
-            el.value = '';
-        }
-    });
-    
-    // Limpar listas de fotos e documentos
-    fotosTemporarias[tipo] = [];
-    documentosTemporarios[tipo] = [];
-    atualizarListasFotos(tipo);
-    atualizarListasDocumentos(tipo);
-    
-    // Desabilitar campos relacionados a checkboxes
-    document.querySelectorAll('[id^="' + tipo + '-"][id$="-campos"]').forEach(d => {
-        d.classList.add('campos-desabilitados');
-        d.querySelectorAll('input, select').forEach(e => e.disabled = true);
-    });
-    
     showTab(tipo);
 }
 
@@ -5186,26 +5162,7 @@ function saveFormTeatro() {
     let obj = { id: equipamentoEmEdicao.tipo === 'teatro' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#teatro input, #teatro textarea, #teatro select').forEach(el => {
         if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
-            // ✅ CORREÇÃO: Capturar checkboxes corretamente
-            if (el.type === 'checkbox') {
-                // Para checkboxes tipo "teatro-foyer-sim" ou "teatro-foyer-nao"
-                const nomeCampo = el.id.replace('teatro-', '');
-                if (nomeCampo.endsWith('-sim') || nomeCampo.endsWith('-nao')) {
-                    const nomeBase = nomeCampo.endsWith('-sim') ? nomeCampo.slice(0, -4) : nomeCampo.slice(0, -4);
-                    const checkSim = document.getElementById('teatro-' + nomeBase + '-sim');
-                    const checkNao = document.getElementById('teatro-' + nomeBase + '-nao');
-                    
-                    if (checkSim && checkNao && (checkSim.checked || checkNao.checked)) {
-                        obj[nomeBase] = checkSim.checked ? 'sim' : 'nao';
-                    }
-                } else {
-                    // Checkboxes normais
-                    obj[nomeCampo] = el.checked;
-                }
-            } else {
-                // Campos normais (text, textarea, select, number)
-                obj[el.id.replace('teatro-', '')] = el.value;
-            }
+            obj[el.id.replace('teatro-', '')] = el.value;
         }
     });
     
@@ -5250,23 +5207,7 @@ function saveFormAuditorio() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'auditorio' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#auditorio input, #auditorio textarea, #auditorio select').forEach(el => {
-        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
-            if (el.type === 'checkbox') {
-                const nomeCampo = el.id.replace('auditorio-', '');
-                if (nomeCampo.endsWith('-sim') || nomeCampo.endsWith('-nao')) {
-                    const nomeBase = nomeCampo.endsWith('-sim') ? nomeCampo.slice(0, -4) : nomeCampo.slice(0, -4);
-                    const checkSim = document.getElementById('auditorio-' + nomeBase + '-sim');
-                    const checkNao = document.getElementById('auditorio-' + nomeBase + '-nao');
-                    if (checkSim && checkNao && (checkSim.checked || checkNao.checked)) {
-                        obj[nomeBase] = checkSim.checked ? 'sim' : 'nao';
-                    }
-                } else {
-                    obj[nomeCampo] = el.checked;
-                }
-            } else {
-                obj[el.id.replace('auditorio-', '')] = el.value;
-            }
-        }
+        if (el.id) obj[el.id.replace('auditorio-', '')] = el.value;
     });
     
     // Se está editando, atualizar; senão adicionar novo
@@ -5306,23 +5247,7 @@ function saveFormCasaCultura() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'casacultura' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#casacultura input, #casacultura textarea, #casacultura select').forEach(el => {
-        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
-            if (el.type === 'checkbox') {
-                const nomeCampo = el.id.replace('casacultura-', '');
-                if (nomeCampo.endsWith('-sim') || nomeCampo.endsWith('-nao')) {
-                    const nomeBase = nomeCampo.endsWith('-sim') ? nomeCampo.slice(0, -4) : nomeCampo.slice(0, -4);
-                    const checkSim = document.getElementById('casacultura-' + nomeBase + '-sim');
-                    const checkNao = document.getElementById('casacultura-' + nomeBase + '-nao');
-                    if (checkSim && checkNao && (checkSim.checked || checkNao.checked)) {
-                        obj[nomeBase] = checkSim.checked ? 'sim' : 'nao';
-                    }
-                } else {
-                    obj[nomeCampo] = el.checked;
-                }
-            } else {
-                obj[el.id.replace('casacultura-', '')] = el.value;
-            }
-        }
+        if (el.id) obj[el.id.replace('casacultura-', '')] = el.value;
     });
     dados.casacultura.push(obj);
     saveData();
@@ -5382,23 +5307,7 @@ function saveFormGenerico() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'generico' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#generico input, #generico textarea, #generico select').forEach(el => {
-        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
-            if (el.type === 'checkbox') {
-                const nomeCampo = el.id.replace('generico-', '');
-                if (nomeCampo.endsWith('-sim') || nomeCampo.endsWith('-nao')) {
-                    const nomeBase = nomeCampo.endsWith('-sim') ? nomeCampo.slice(0, -4) : nomeCampo.slice(0, -4);
-                    const checkSim = document.getElementById('generico-' + nomeBase + '-sim');
-                    const checkNao = document.getElementById('generico-' + nomeBase + '-nao');
-                    if (checkSim && checkNao && (checkSim.checked || checkNao.checked)) {
-                        obj[nomeBase] = checkSim.checked ? 'sim' : 'nao';
-                    }
-                } else {
-                    obj[nomeCampo] = el.checked;
-                }
-            } else {
-                obj[el.id.replace('generico-', '')] = el.value;
-            }
-        }
+        if (el.id) obj[el.id.replace('generico-', '')] = el.value;
     });
     
     // Se está editando, atualizar; senão adicionar novo
@@ -5526,37 +5435,13 @@ function editarEspaco(tipo, id) {
         if (chave === 'id') return;
         const fieldId = tipo + '-' + chave;
         const field = document.getElementById(fieldId);
-        
         if (field) {
             if (field.type === 'checkbox') {
-                // ✅ CORREÇÃO: Restaurar valor do checkbox
-                field.checked = equipamento[chave] === true || equipamento[chave] === 'true' || equipamento[chave] === 'sim';
+                field.checked = equipamento[chave] === true || equipamento[chave] === 'true';
             } else {
                 field.value = equipamento[chave] || '';
             }
             field.disabled = false;
-        } else {
-            // ✅ CORREÇÃO: Se campo não existe (como teatro-foyer), procurar os checkboxes sim/nao
-            const fieldSimId = tipo + '-' + chave + '-sim';
-            const fieldNaoId = tipo + '-' + chave + '-nao';
-            const fieldSim = document.getElementById(fieldSimId);
-            const fieldNao = document.getElementById(fieldNaoId);
-            
-            if (fieldSim && fieldNao) {
-                const valor = equipamento[chave];
-                fieldSim.checked = (valor === 'sim' || valor === true);
-                fieldNao.checked = (valor === 'nao' || valor === false);
-                
-                // ✅ CORREÇÃO: Se checkbox está marcado, habilitar campos relacionados
-                const camposId = tipo + '-' + chave + '-campos';
-                const campos = document.getElementById(camposId);
-                if (campos) {
-                    if (fieldSim.checked || fieldNao.checked) {
-                        campos.classList.remove('campos-desabilitados');
-                        campos.querySelectorAll('input, select').forEach(e => e.disabled = false);
-                    }
-                }
-            }
         }
     });
     
