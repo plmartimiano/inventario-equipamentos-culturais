@@ -4530,44 +4530,145 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
         const dataHora = `${dia}_${mes}_${ano}_${horas}h${minutos}m${segundos}s`;
         const nomePDF = `${tipo}_${obj.nome.replace(/\s+/g, '_')}_${dataHora}.pdf`;
         
-        // Criar HTML do relatório
+        // Criar HTML do relatório com formatação melhorada
         let htmlRelatorio = `
-            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px;">
-                <h1 style="text-align: center; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">
-                    📋 Relatório - ${tipo.toUpperCase()}
-                </h1>
-                
-                <div style="margin: 20px 0; background: #f5f5f5; padding: 15px; border-radius: 5px;">
-                    <h2 style="color: #667eea; margin-top: 0;">📌 Identificação</h2>
-                    <p><strong>Nome:</strong> ${obj.nome || 'N/A'}</p>
-                    <p><strong>Data do Relatório:</strong> ${dia}/${mes}/${ano} às ${horas}:${minutos}:${segundos}</p>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { padding: 15px; max-width: 900px; }
+        .header { 
+            text-align: center; 
+            border-bottom: 3px solid #667eea; 
+            margin-bottom: 25px; 
+            padding-bottom: 15px;
+        }
+        .header h1 { font-size: 28px; color: #667eea; margin: 0; }
+        .section { 
+            margin: 25px 0; 
+            padding: 15px; 
+            background: #f8f9ff; 
+            border-left: 4px solid #667eea;
+            page-break-inside: avoid;
+        }
+        .section h2 { 
+            font-size: 18px; 
+            color: #667eea; 
+            margin-bottom: 15px; 
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+        .info-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 12px; 
+            margin: 10px 0;
+        }
+        .info-item { 
+            padding: 8px; 
+            background: white; 
+            border-radius: 3px; 
+            border-left: 3px solid #667eea;
+        }
+        .info-item strong { color: #667eea; display: block; margin-bottom: 3px; }
+        .info-item span { color: #555; }
+        .foto-container {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            page-break-inside: avoid;
+        }
+        .foto-container h3 { 
+            color: #555; 
+            margin-bottom: 10px; 
+            font-size: 14px;
+        }
+        .foto-container img { 
+            max-width: 100%; 
+            height: auto; 
+            max-height: 300px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+        }
+        .foto-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px solid #ddd;
+            text-align: center;
+            font-size: 11px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Relatório - ${tipo.toUpperCase()}</h1>
+        </div>
+        
+        <div class="section">
+            <h2>📌 Identificação</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Nome:</strong>
+                    <span>${obj.nome || 'N/A'}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Data/Hora:</strong>
+                    <span>${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}</span>
+                </div>
         `;
         
-        // Adicionar campos do equipamento
+        // Adicionar campos principais (limitado)
+        let contador = 2;
         Object.keys(obj).forEach(chave => {
             if (['id', 'nome'].includes(chave)) return;
             if (!obj[chave] || obj[chave] === '' || obj[chave] === 'N/A') return;
+            if (contador > 10) return; // Limitar a 10 campos
             
             const nomeFormatado = chave.replace(/_/g, ' ').toUpperCase();
-            const valor = obj[chave];
+            const valor = String(obj[chave]).substring(0, 50); // Limitar comprimento
             
-            htmlRelatorio += `<p><strong>${nomeFormatado}:</strong> ${valor}</p>`;
+            htmlRelatorio += `
+                <div class="info-item">
+                    <strong>${nomeFormatado}:</strong>
+                    <span>${valor}</span>
+                </div>
+            `;
+            contador++;
         });
         
-        htmlRelatorio += `</div>`;
+        htmlRelatorio += `
+            </div>
+        </div>
+        `;
         
-        // Adicionar fotos
+        // Adicionar fotos com links
         if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
             htmlRelatorio += `
-                <div style="margin: 20px 0;">
-                    <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px;">📷 Fotos</h2>
+                <div class="section">
+                    <h2>📷 Fotos (${fotosTemporarias[tipo].length})</h2>
             `;
             
             fotosTemporarias[tipo].forEach((foto, index) => {
                 htmlRelatorio += `
-                    <div style="margin: 15px 0; page-break-inside: avoid;">
-                        <h3 style="color: #555; margin: 10px 0 5px 0;">Foto ${index + 1}: ${foto.descricao}</h3>
-                        <img src="data:image/jpeg;base64,${foto.base64}" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 5px;">
+                    <div class="foto-container">
+                        <h3>📸 Foto ${index + 1}: ${foto.descricao}</h3>
+                        <img src="data:image/jpeg;base64,${foto.base64}" />
+                        <p style="font-size: 11px; color: #999; margin: 5px 0;">
+                            Arquivo: ${foto.nome}
+                        </p>
                     </div>
                 `;
             });
@@ -4576,7 +4677,14 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
         }
         
         htmlRelatorio += `
+            <div class="footer">
+                <p>📁 Equipamento: ${tipo.toUpperCase()}</p>
+                <p>🕐 Gerado em: ${dia}/${mes}/${ano} às ${horas}:${minutos}:${segundos}</p>
+                <p>✅ Relatório gerado automaticamente pelo Sistema de Inventário</p>
             </div>
+        </div>
+    </body>
+</html>
         `;
         
         // Gerar PDF usando html2pdf
@@ -4584,11 +4692,12 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
         element.innerHTML = htmlRelatorio;
         
         const opt = {
-            margin: 10,
+            margin: 5,
             filename: nomePDF,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, logging: false },
+            jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' },
+            pagebreak: { mode: 'avoid-all', before: '.page-break' }
         };
         
         // Gerar PDF
