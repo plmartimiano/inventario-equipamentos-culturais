@@ -99,12 +99,45 @@ async function deletarPasta(pastaId) {
 
     console.log(`[API] Deletando pasta: ${pastaId}`);
 
+    // ✅ NOVO: Verificar se a pasta existe primeiro
+    try {
+      const fileInfo = await drive.files.get({
+        fileId: pastaId,
+        fields: 'id, name, webViewLink',
+        supportsTeamDrives: true,
+      });
+      console.log(`[API] ✅ Pasta encontrada:`, fileInfo.data.name);
+    } catch (checkError) {
+      console.error(`[API] ⚠️ Pasta não encontrada ou sem acesso:`, checkError.message);
+      throw new Error(`Pasta não encontrada ou sem acesso: ${checkError.message}`);
+    }
+
+    // ✅ NOVO: Compartilhar com a Service Account antes de deletar
+    const serviceAccountEmail = serviceAccount.client_email;
+    try {
+      await drive.permissions.create({
+        fileId: pastaId,
+        resource: {
+          kind: 'drive#permission',
+          type: 'user',
+          role: 'owner',
+          emailAddress: serviceAccountEmail,
+        },
+        fields: 'id',
+        supportsTeamDrives: true,
+      });
+      console.log(`[API] ✅ Permissões atualizadas para Service Account`);
+    } catch (permError) {
+      console.log(`[API] ℹ️ Permissões já existem ou erro (continuando):`, permError.message);
+    }
+
+    // ✅ Agora deletar a pasta
     await drive.files.delete({
       fileId: pastaId,
       supportsTeamDrives: true,
     });
 
-    console.log(`[API] Pasta ${pastaId} deletada com sucesso`);
+    console.log(`[API] ✅ Pasta ${pastaId} deletada com sucesso`);
     return { sucesso: true, mensagem: 'Pasta deletada com sucesso' };
   } catch (error) {
     console.error(`[API] Erro ao deletar pasta ${pastaId}:`, error.message);
