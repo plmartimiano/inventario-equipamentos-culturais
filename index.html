@@ -148,7 +148,6 @@
     <!-- MENU -->
     <div id="menu" class="content">
         <button class="btn btn-success" data-onclick="exportJSON()">📥 Exportar JSON</button>
-        <button class="btn btn-danger" data-onclick="limparDados()" style="margin-left: 10px;">🗑️ Limpar Dados Locais</button>
         <div class="equipamento-card">
             <h3>🎭 Teatro</h3>
             <div class="badge" id="teatro-count">0</div>
@@ -4901,17 +4900,6 @@ function atualizarIndicadorMunicipio() {
 function showTab(t) {
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
     document.getElementById(t).classList.add('active');
-}
-
-// ✅ NOVO: Função para limpar dados locais
-function limparDados() {
-    if (confirm('⚠️ ATENÇÃO: Isso vai DELETAR todos os dados locais!\n\nTem CERTEZA?')) {
-        if (confirm('🚨 ÚLTIMA CHANCE: Vai perder TUDO!\n\nConfirma mesmo?')) {
-            localStorage.clear();
-            alert('✅ Dados locais DELETADOS!\n\nPágina vai recarregar...');
-            location.reload();
-        }
-    }
 }
 
 function startForm(tipo) {
