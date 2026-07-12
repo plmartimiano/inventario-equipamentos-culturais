@@ -4630,15 +4630,13 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
                 </div>
         `;
         
-        // Adicionar campos principais (limitado)
-        let contador = 2;
+        // Adicionar todos os campos (SEM LIMITE)
         Object.keys(obj).forEach(chave => {
             if (['id', 'nome'].includes(chave)) return;
             if (!obj[chave] || obj[chave] === '' || obj[chave] === 'N/A') return;
-            if (contador > 10) return; // Limitar a 10 campos
             
             const nomeFormatado = chave.replace(/_/g, ' ').toUpperCase();
-            const valor = String(obj[chave]).substring(0, 50); // Limitar comprimento
+            const valor = String(obj[chave]); // SEM limite de comprimento
             
             htmlRelatorio += `
                 <div class="info-item">
@@ -4646,7 +4644,6 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
                     <span>${valor}</span>
                 </div>
             `;
-            contador++;
         });
         
         htmlRelatorio += `
