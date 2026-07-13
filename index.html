@@ -5150,6 +5150,18 @@ function showTab(t) {
 }
 
 function startForm(tipo) {
+    // ✅ CORREÇÃO MÍNIMA: Resetar para novo equipamento (não edição)
+    equipamentoEmEdicao = { tipo: null, id: null };
+    
+    // ✅ CORREÇÃO MÍNIMA: Limpar campos do formulário anterior
+    document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
+        if (el.type === 'checkbox' || el.type === 'radio') {
+            el.checked = false;
+        } else {
+            el.value = '';
+        }
+    });
+    
     showTab(tipo);
 }
 
