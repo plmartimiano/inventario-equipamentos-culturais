@@ -133,9 +133,10 @@
                 <div class="form-group"><label>Cargo</label><input type="text" id="municipio-cargo" placeholder="Cargo/Função"></div>
                 <div class="form-group"><label>Endereço</label><textarea id="municipio-endereco" placeholder="Endereço completo da prefeitura/secretaria"></textarea></div>
                 <div class="form-group"><label>Telefone</label><input type="text" id="municipio-telefone" placeholder="(00) 0000-0000"></div>
-                <div class="form-group"><label>E-mail</label><input type="text" id="municipio-email" placeholder="email@example.com"></div>
+                <div class="form-group"><label>E-mail</label><input type="text" id="municipio-email" placeholder="email@example.com" onblur="validarEmailCampo(this)"></div>
                 <div class="form-group"><label>WhatsApp</label><input type="text" id="municipio-whatsapp" placeholder="(00) 00000-0000"></div>
-                <div class="form-group"><label>Data da Atualização</label><input type="date" id="municipio-data"></div>
+                <div class="form-group"><label>Site</label><input type="text" id="municipio-site" placeholder="https://..."></div>
+                <div class="form-group"><label>Data da Atualização</label><input type="text" id="municipio-data" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" oninput="formatarDataAutomatica(this)"></div>
                 <div class="form-group"><label>Observações</label><textarea id="municipio-obs" placeholder="Observações gerais sobre o município"></textarea></div>
                 
                 <div style="display: flex; gap: 10px;">
@@ -204,8 +205,9 @@
             <div class="form-group"><label>Nome do Teatro</label><input type="text" id="teatro-nome" placeholder="Nome"></div>
             <div class="form-group"><label>Endereço Completo</label><textarea id="teatro-endereco" placeholder="Endereço"></textarea></div>
             <div class="form-group"><label>Telefone</label><input type="text" id="teatro-telefone" placeholder="(00) 0000-0000"></div>
-            <div class="form-group"><label>Email</label><input type="text" id="teatro-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="teatro-email" placeholder="email@example.com" onblur="validarEmailCampo(this)"></div>
             <div class="form-group"><label>Responsável</label><input type="text" id="teatro-responsavel"></div>
+            <div class="form-group"><label>Telefone do Responsável</label><input type="text" id="teatro-telefone-responsavel" placeholder="(00) 0000-0000"></div>
             <div class="form-group"><label>Capacidade (pessoas)</label><input type="number" id="teatro-capacidade"></div>
             <div class="form-group"><label>Altura Palco (cm)</label><input type="number" id="teatro-altura"></div>
             <div class="form-group"><label>Profundidade (m)</label><input type="number" id="teatro-profundidade"></div>
@@ -874,7 +876,7 @@
                 <div id="teatro-seg-avcb-campos" class="campos-desabilitados">
                     <div class="rider-row">
                         <div><div class="rider-label">Válido?</div><select class="rider-input" id="teatro-seg-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
-                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="teatro-seg-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="teatro-seg-avcb-vencimento" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" oninput="formatarDataAutomatica(this)" disabled></div>
                         <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="teatro-seg-avcb-numero" disabled></div>
                     </div>
                     <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="teatro-seg-avcb-obs" disabled></textarea></div>
@@ -943,8 +945,9 @@
             <div class="form-group"><label>Nome do Auditório</label><input type="text" id="auditorio-nome" placeholder="Nome"></div>
             <div class="form-group"><label>Endereço Completo</label><textarea id="auditorio-endereco" placeholder="Endereço"></textarea></div>
             <div class="form-group"><label>Telefone</label><input type="text" id="auditorio-telefone" placeholder="(00) 0000-0000"></div>
-            <div class="form-group"><label>Email</label><input type="text" id="auditorio-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="auditorio-email" placeholder="email@example.com" onblur="validarEmailCampo(this)"></div>
             <div class="form-group"><label>Responsável</label><input type="text" id="auditorio-responsavel"></div>
+            <div class="form-group"><label>Telefone do Responsável</label><input type="text" id="auditorio-telefone-responsavel" placeholder="(00) 0000-0000"></div>
             <div class="form-group"><label>Capacidade (pessoas)</label><input type="number" id="auditorio-capacidade"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="auditorio-id-obs" placeholder="Informações adicionais"></textarea></div>
 
@@ -1507,7 +1510,7 @@
                 <div id="auditorio-seg-avcb-campos" class="campos-desabilitados">
                     <div class="rider-row">
                         <div><div class="rider-label">Válido?</div><select class="rider-input" id="auditorio-seg-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
-                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="auditorio-seg-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="auditorio-seg-avcb-vencimento" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" oninput="formatarDataAutomatica(this)" disabled></div>
                         <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="auditorio-seg-avcb-numero" disabled></div>
                     </div>
                     <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="auditorio-seg-avcb-obs" disabled></textarea></div>
@@ -1576,8 +1579,9 @@
             <div class="form-group"><label>Nome da Casa de Cultura</label><input type="text" id="casacultura-nome" placeholder="Nome"></div>
             <div class="form-group"><label>Endereço Completo</label><textarea id="casacultura-endereco" placeholder="Endereço"></textarea></div>
             <div class="form-group"><label>Telefone</label><input type="text" id="casacultura-telefone" placeholder="(00) 0000-0000"></div>
-            <div class="form-group"><label>Email</label><input type="text" id="casacultura-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="casacultura-email" placeholder="email@example.com" onblur="validarEmailCampo(this)"></div>
             <div class="form-group"><label>Responsável</label><input type="text" id="casacultura-responsavel"></div>
+            <div class="form-group"><label>Telefone do Responsável</label><input type="text" id="casacultura-telefone-responsavel" placeholder="(00) 0000-0000"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="casacultura-id-obs" placeholder="Informações adicionais"></textarea></div>
 
             <!-- BLOCO 1: INFRAESTRUTURA FÍSICA E ARQUITETÔNICA -->
@@ -2064,7 +2068,7 @@
                 <div id="cc-avcb-campos" class="campos-desabilitados">
                     <div class="rider-row">
                         <div><div class="rider-label">Válido?</div><select class="rider-input" id="cc-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
-                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="cc-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="cc-avcb-vencimento" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" oninput="formatarDataAutomatica(this)" disabled></div>
                         <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="cc-avcb-numero" disabled></div>
                     </div>
                     <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="cc-avcb-obs" disabled></textarea></div>
@@ -2161,8 +2165,9 @@
             <div class="form-group"><label>Nome da Praça</label><input type="text" id="praca-nome" placeholder="Nome"></div>
             <div class="form-group"><label>Endereço / Localização</label><textarea id="praca-endereco" placeholder="Endereço completo"></textarea></div>
             <div class="form-group"><label>Telefone</label><input type="text" id="praca-telefone" placeholder="(00) 0000-0000"></div>
-            <div class="form-group"><label>Email / Contato</label><input type="text" id="praca-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Email / Contato</label><input type="text" id="praca-email" placeholder="email@example.com" onblur="validarEmailCampo(this)"></div>
             <div class="form-group"><label>Responsável / Gestor</label><input type="text" id="praca-responsavel"></div>
+            <div class="form-group"><label>Telefone do Responsável</label><input type="text" id="praca-telefone-responsavel" placeholder="(00) 0000-0000"></div>
             <div class="form-group"><label>Capacidade Estimada (pessoas)</label><input type="number" id="praca-capacidade"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="praca-id-obs" placeholder="Informações adicionais"></textarea></div>
 
@@ -2611,8 +2616,9 @@
             <div class="form-group"><label>Nome da Biblioteca</label><input type="text" id="biblioteca-nome" placeholder="Nome"></div>
             <div class="form-group"><label>Endereço Completo</label><textarea id="biblioteca-endereco" placeholder="Endereço"></textarea></div>
             <div class="form-group"><label>Telefone</label><input type="text" id="biblioteca-telefone" placeholder="(00) 0000-0000"></div>
-            <div class="form-group"><label>Email</label><input type="text" id="biblioteca-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="biblioteca-email" placeholder="email@example.com" onblur="validarEmailCampo(this)"></div>
             <div class="form-group"><label>Responsável</label><input type="text" id="biblioteca-responsavel"></div>
+            <div class="form-group"><label>Telefone do Responsável</label><input type="text" id="biblioteca-telefone-responsavel" placeholder="(00) 0000-0000"></div>
             <div class="form-group"><label>Capacidade (pessoas)</label><input type="number" id="biblioteca-capacidade"></div>
             <div class="form-group"><label>Quantidade do Acervo (títulos)</label><input type="number" id="biblioteca-acervo-qtd" placeholder="Quantidade total de livros/títulos"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="biblioteca-id-obs" placeholder="Informações adicionais"></textarea></div>
@@ -3159,7 +3165,7 @@
                 <div id="bib-seg-avcb-campos" class="campos-desabilitados">
                     <div class="rider-row">
                         <div><div class="rider-label">Válido?</div><select class="rider-input" id="bib-seg-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
-                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="bib-seg-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="bib-seg-avcb-vencimento" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" oninput="formatarDataAutomatica(this)" disabled></div>
                         <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="bib-seg-avcb-numero" disabled></div>
                     </div>
                     <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="bib-seg-avcb-obs" disabled></textarea></div>
@@ -3227,8 +3233,9 @@
             <div class="form-group"><label>Nome do Ginásio</label><input type="text" id="ginasio-nome" placeholder="Nome"></div>
             <div class="form-group"><label>Endereço Completo</label><textarea id="ginasio-endereco" placeholder="Endereço completo"></textarea></div>
             <div class="form-group"><label>Telefone</label><input type="text" id="ginasio-telefone" placeholder="(00) 0000-0000"></div>
-            <div class="form-group"><label>Email</label><input type="text" id="ginasio-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="ginasio-email" placeholder="email@example.com" onblur="validarEmailCampo(this)"></div>
             <div class="form-group"><label>Responsável</label><input type="text" id="ginasio-responsavel"></div>
+            <div class="form-group"><label>Telefone do Responsável</label><input type="text" id="ginasio-telefone-responsavel" placeholder="(00) 0000-0000"></div>
             <div class="form-group"><label>Capacidade Total (pessoas)</label><input type="number" id="ginasio-capacidade"></div>
             <div class="form-group"><label>Observações da Identificação</label><textarea id="ginasio-id-obs" placeholder="Informações adicionais"></textarea></div>
 
@@ -3595,7 +3602,7 @@
                 <div id="gin-seg-avcb-campos" class="campos-desabilitados">
                     <div class="rider-row">
                         <div><div class="rider-label">Válido?</div><select class="rider-input" id="gin-seg-avcb-valido" disabled><option>Sim</option><option>Não</option></select></div>
-                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="gin-seg-avcb-vencimento" disabled></div>
+                        <div><div class="rider-label">Data Vencimento</div><input type="text" class="rider-input" id="gin-seg-avcb-vencimento" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" oninput="formatarDataAutomatica(this)" disabled></div>
                         <div><div class="rider-label">Processo Nº</div><input type="text" class="rider-input" id="gin-seg-avcb-numero" disabled></div>
                     </div>
                     <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="gin-seg-avcb-obs" disabled></textarea></div>
@@ -3686,8 +3693,9 @@
             </div>
             <div class="form-group"><label>Endereço / Localização</label><textarea id="generico-endereco" placeholder="Endereço completo, bairro, ponto de referência"></textarea></div>
             <div class="form-group"><label>Telefone</label><input type="text" id="generico-telefone" placeholder="(00) 0000-0000"></div>
-            <div class="form-group"><label>Email / Contato</label><input type="text" id="generico-email" placeholder="email@example.com"></div>
+            <div class="form-group"><label>Email / Contato</label><input type="text" id="generico-email" placeholder="email@example.com" onblur="validarEmailCampo(this)"></div>
             <div class="form-group"><label>Responsável / Gestor do Espaço</label><input type="text" id="generico-responsavel"></div>
+            <div class="form-group"><label>Telefone do Responsável</label><input type="text" id="generico-telefone-responsavel" placeholder="(00) 0000-0000"></div>
             <div class="form-group"><label>Vínculo / Natureza</label>
                 <select id="generico-vinculo">
                     <option value="">Selecione...</option>
@@ -4039,7 +4047,7 @@
                 <div id="generico-avcb-campos" class="campos-desabilitados">
                     <div class="rider-row">
                         <div><div class="rider-label">Válido?</div><select class="rider-input" id="generico-avcb-valido" disabled><option>Sim</option><option>Não</option><option>Vencido</option><option>Em processo</option></select></div>
-                        <div><div class="rider-label">Data de Vencimento</div><input type="text" class="rider-input" id="generico-avcb-venc" disabled></div>
+                        <div><div class="rider-label">Data de Vencimento</div><input type="text" class="rider-input" id="generico-avcb-venc" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" oninput="formatarDataAutomatica(this)" disabled></div>
                         <div><div class="rider-label">Nº do Processo</div><input type="text" class="rider-input" id="generico-avcb-processo" disabled></div>
                     </div>
                     <div class="form-group"><div class="rider-label">Observações</div><textarea class="rider-input" id="generico-avcb-obs" disabled></textarea></div>
@@ -5256,9 +5264,11 @@ function saveMunicipio() {
         telefone: document.getElementById('municipio-telefone').value,
         email: document.getElementById('municipio-email').value,
         whatsapp: document.getElementById('municipio-whatsapp').value,
+        site: document.getElementById('municipio-site').value,
         data: document.getElementById('municipio-data').value,
         obs: document.getElementById('municipio-obs').value,
-        equipamentos: municipios[chave]?.equipamentos || {} // Preservar equipamentos existentes
+        equipamentos: municipios[chave]?.equipamentos || {}, // Preservar equipamentos existentes
+        pastaId: municipios[chave]?.pastaId // Preservar o id da pasta no Drive entre edições
     };
     
     // Selecionar este município como atual
@@ -5332,6 +5342,7 @@ function loadMunicipio() {
         document.getElementById('municipio-telefone').value = m.telefone || '';
         document.getElementById('municipio-email').value = m.email || '';
         document.getElementById('municipio-whatsapp').value = m.whatsapp || '';
+        document.getElementById('municipio-site').value = m.site || '';
         document.getElementById('municipio-data').value = m.data || '';
         document.getElementById('municipio-obs').value = m.obs || '';
     } else {
@@ -5346,6 +5357,7 @@ function loadMunicipio() {
             document.getElementById('municipio-telefone').value = municipioData.telefone || '';
             document.getElementById('municipio-email').value = municipioData.email || '';
             document.getElementById('municipio-whatsapp').value = municipioData.whatsapp || '';
+            document.getElementById('municipio-site').value = municipioData.site || '';
             document.getElementById('municipio-data').value = municipioData.data || '';
             document.getElementById('municipio-obs').value = municipioData.obs || '';
         }
@@ -5907,6 +5919,33 @@ function deleteEspaco(t, id) {
     }
 }
 
+// Formata automaticamente campos de data no padrão dd/mm/aaaa, inserindo as barras
+// enquanto o usuário digita apenas os números.
+function formatarDataAutomatica(input) {
+    const digitos = input.value.replace(/\D/g, '').slice(0, 8);
+    let formatado = digitos;
+    if (digitos.length > 4) {
+        formatado = digitos.slice(0, 2) + '/' + digitos.slice(2, 4) + '/' + digitos.slice(4);
+    } else if (digitos.length > 2) {
+        formatado = digitos.slice(0, 2) + '/' + digitos.slice(2);
+    }
+    input.value = formatado;
+}
+
+// Verifica se um campo de e-mail contém "@"; sinaliza visualmente quando inválido
+function validarEmailCampo(input) {
+    const valor = input.value.trim();
+    if (valor && !valor.includes('@')) {
+        input.style.borderColor = '#dc3545';
+        input.style.borderWidth = '2px';
+        input.title = '⚠️ E-mail inválido: deve conter "@"';
+    } else {
+        input.style.borderColor = '';
+        input.style.borderWidth = '';
+        input.title = '';
+    }
+}
+
 function showMsg(t) {
     document.getElementById('msg').innerHTML = '<div class="msg">' + t + '</div>';
     // Avisos de erro (⚠️) ficam mais tempo na tela, para dar tempo de ler o detalhe técnico
@@ -5962,6 +6001,7 @@ function limparFormularioMunicipio() {
     document.getElementById('municipio-telefone').value = '';
     document.getElementById('municipio-email').value = '';
     document.getElementById('municipio-whatsapp').value = '';
+    document.getElementById('municipio-site').value = '';
     document.getElementById('municipio-data').value = '';
     document.getElementById('municipio-obs').value = '';
     document.getElementById('municipio-select').value = '';
@@ -5985,6 +6025,7 @@ function ocultarFormularioMunicipio() {
     document.getElementById('municipio-telefone').value = '';
     document.getElementById('municipio-email').value = '';
     document.getElementById('municipio-whatsapp').value = '';
+    document.getElementById('municipio-site').value = '';
     document.getElementById('municipio-data').value = '';
     document.getElementById('municipio-obs').value = '';
 }
