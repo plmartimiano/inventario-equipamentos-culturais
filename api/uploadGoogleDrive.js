@@ -49,6 +49,7 @@ async function criarPasta(nome, pastaRaizId = SHARED_DRIVE_ID) {
         parents: [pastaRaizId],
       },
       fields: 'id, name, webViewLink',
+      supportsAllDrives: true,
       supportsTeamDrives: true,
     });
 
@@ -81,6 +82,7 @@ async function uploadArquivo(nomeArquivo, conteudoBase64, pastaId) {
         body: stream,
       },
       fields: 'id, name, webViewLink',
+      supportsAllDrives: true,
       supportsTeamDrives: true,
     });
 
@@ -99,11 +101,12 @@ async function deletarPasta(pastaId) {
 
     console.log(`[API] Deletando pasta: ${pastaId}`);
 
-    // ✅ NOVO: Verificar se a pasta existe primeiro
+    // ✅ Verificar se a pasta existe primeiro
     try {
       const fileInfo = await drive.files.get({
         fileId: pastaId,
         fields: 'id, name, webViewLink',
+        supportsAllDrives: true,
         supportsTeamDrives: true,
       });
       console.log(`[API] ✅ Pasta encontrada:`, fileInfo.data.name);
@@ -112,28 +115,13 @@ async function deletarPasta(pastaId) {
       throw new Error(`Pasta não encontrada ou sem acesso: ${checkError.message}`);
     }
 
-    // ✅ NOVO: Compartilhar com a Service Account antes de deletar
-    const serviceAccountEmail = serviceAccount.client_email;
-    try {
-      await drive.permissions.create({
-        fileId: pastaId,
-        resource: {
-          kind: 'drive#permission',
-          type: 'user',
-          role: 'owner',
-          emailAddress: serviceAccountEmail,
-        },
-        fields: 'id',
-        supportsTeamDrives: true,
-      });
-      console.log(`[API] ✅ Permissões atualizadas para Service Account`);
-    } catch (permError) {
-      console.log(`[API] ℹ️ Permissões já existem ou erro (continuando):`, permError.message);
-    }
-
-    // ✅ Agora deletar a pasta
+    // Deletar a pasta. Não é necessário conceder permissão de "owner" antes: itens
+    // dentro de um Drive Compartilhado não têm dono individual (a Service Account já
+    // tem acesso suficiente para apagar o que ela mesma criou dentro do Drive), e a
+    // API do Google rejeita role:"owner" para itens de Drive Compartilhado de qualquer forma.
     await drive.files.delete({
       fileId: pastaId,
+      supportsAllDrives: true,
       supportsTeamDrives: true,
     });
 
