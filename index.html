@@ -5726,6 +5726,18 @@ function saveData() {
     sincronizarMunicipiosParaFirestore();
 }
 
+// Salva só no localStorage, sem sincronizar com o Firestore. Usada nos passos
+// intermediários de salvarTeatro()/saveFormAuditorio()/etc — logo depois de inserir o
+// equipamento em "dados" mas ANTES do upload de fotos/documentos terminar (salvarEquipamentoV3
+// ainda vai preencher obj.fotos/obj.documentos). Se essa etapa intermediária sincronizasse
+// com o Firestore, o listener em tempo real (iniciarSincronizacaoMunicipios) reagiria à
+// própria escrita e substituiria "municipios"/"dados" por uma cópia reconstruída a partir do
+// servidor SEM fotos/documentos ainda — desconectando a referência "obj" da árvore antes dela
+// ser preenchida, e fazendo as fotos/documentos sumirem do relatório e do banco.
+function salvarLocalmente() {
+    localStorage.setItem('municipios', JSON.stringify(municipios));
+}
+
 function mostrarAbasEquipamentos() {
     // Mostrar todas as abas de equipamentos quando um município é selecionado
     const abas = [
@@ -5843,7 +5855,7 @@ async function salvarTeatro(obj) {
         dados.teatro.push(obj);
     }
 
-    saveData();
+    salvarLocalmente();
     updateLists();
     document.querySelectorAll('#teatro input, #teatro textarea').forEach(el => el.value = '');
     document.querySelectorAll('#teatro input[type="checkbox"]').forEach(el => el.checked = false);
@@ -5884,7 +5896,7 @@ async function saveFormAuditorio() {
         dados.auditorio.push(obj);
     }
 
-    saveData();
+    salvarLocalmente();
     updateLists();
     document.querySelectorAll('#auditorio input, #auditorio textarea').forEach(el => el.value = '');
     document.querySelectorAll('#auditorio input[type="checkbox"]').forEach(el => el.checked = false);
@@ -5923,7 +5935,7 @@ async function saveFormCasaCultura() {
         dados.casacultura.push(obj);
     }
 
-    saveData();
+    salvarLocalmente();
     updateLists();
     document.querySelectorAll('#casacultura input, #casacultura textarea').forEach(el => el.value = '');
     document.querySelectorAll('#casacultura input[type="checkbox"]').forEach(el => el.checked = false);
@@ -5963,7 +5975,7 @@ async function saveForm(tipo) {
         dados[tipo].push(obj);
     }
 
-    saveData();
+    salvarLocalmente();
     updateLists();
     document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea').forEach(el => el.value = '');
     // V3.0: Salvar com subpasta + fotos + documentos — aguarda terminar antes de liberar
@@ -5998,7 +6010,7 @@ async function saveFormGenerico() {
         dados.generico.push(obj);
     }
 
-    saveData();
+    salvarLocalmente();
     updateLists();
     document.querySelectorAll('#generico input, #generico textarea').forEach(el => el.value = '');
     document.querySelectorAll('#generico select').forEach(el => el.selectedIndex = 0);
