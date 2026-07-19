@@ -5376,14 +5376,25 @@ async function salvarEquipamentoV3(tipo, obj) {
     
     console.log('municipioAtual:', municipioAtual);
     console.log('pastasMunicipio:', pastasMunicipio);
-    
-    if (!municipioAtual || !pastasMunicipio[municipioAtual]) {
+
+    // O ID da pasta do MUNICÍPIO no Drive é guardado tanto no mapa local "pastasMunicipio"
+    // (só existe no aparelho que criou o município) quanto no próprio município
+    // (municipios[chave].pastaId, que viaja pelo Firestore). Um aparelho que só RECEBEU
+    // esse município via sincronização em tempo real nunca populou o mapa local — por
+    // isso priorizamos o valor sincronizado, com o mapa local como respaldo/legado.
+    const municipioPastaId = (municipios[municipioAtual] && municipios[municipioAtual].pastaId) || pastasMunicipio[municipioAtual];
+    if (municipioPastaId && pastasMunicipio[municipioAtual] !== municipioPastaId) {
+        pastasMunicipio[municipioAtual] = municipioPastaId;
+        localStorage.setItem('pastasMunicipio', JSON.stringify(pastasMunicipio));
+    }
+
+    if (!municipioAtual || !municipioPastaId) {
         console.error('❌ ERRO: municipioAtual ou pasta não existem!');
         console.log('municipioAtual:', municipioAtual, 'existe?', !!municipioAtual);
-        console.log('pastasMunicipio[municipioAtual]:', pastasMunicipio[municipioAtual]);
+        console.log('municipioPastaId:', municipioPastaId);
         return;
     }
-    
+
     try {
         const chaveSubpasta = `${municipioAtual}_${tipo}_${obj.id}`;
         console.log('📝 chaveSubpasta:', chaveSubpasta);
@@ -5397,7 +5408,7 @@ async function salvarEquipamentoV3(tipo, obj) {
         // Criar subpasta se não existir
         if (!subpastaId) {
             console.log('📁 Criando subpasta...');
-            subpastaId = await criarSubpastaEquipamento(tipo, obj.nome, pastasMunicipio[municipioAtual]);
+            subpastaId = await criarSubpastaEquipamento(tipo, obj.nome, municipioPastaId);
             if (subpastaId) {
                 console.log('✅ Subpasta criada:', subpastaId);
             }
