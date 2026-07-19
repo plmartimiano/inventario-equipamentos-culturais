@@ -4290,16 +4290,21 @@ function removerUndefinedRecursivo(valor) {
 // como cache local — assim o app continua funcionando (em modo só-leitura do último
 // estado conhecido) mesmo numa queda momentânea de conexão.
 async function sincronizarMunicipiosParaFirestore() {
-    if (!firebaseDisponivel || !db || !usuarioAtual) return;
+    if (!firebaseDisponivel || !db || !usuarioAtual) {
+        console.log('[SYNC] Gravação ignorada: firebaseDisponivel=', firebaseDisponivel, 'db=', !!db, 'usuarioAtual=', !!usuarioAtual);
+        return;
+    }
     try {
         const lote = db.batch();
-        Object.keys(municipios).forEach(chave => {
+        const chaves = Object.keys(municipios);
+        chaves.forEach(chave => {
             const ref = db.collection('municipios').doc(chave);
             lote.set(ref, removerUndefinedRecursivo(municipios[chave]));
         });
         await lote.commit();
+        console.log('[SYNC] Gravação concluída no Firestore —', chaves.length, 'município(s):', chaves);
     } catch (erro) {
-        console.error('❌ Erro ao sincronizar com Firestore:', erro);
+        console.error('[SYNC] ❌ Erro ao gravar no Firestore:', erro.code, erro.message);
         showMsg('⚠️ Erro ao sincronizar dados com o servidor: ' + erro.message);
     }
 }
@@ -4307,11 +4312,14 @@ async function sincronizarMunicipiosParaFirestore() {
 // Ouve em tempo real a coleção "municipios" no Firestore — qualquer alteração feita
 // por qualquer aparelho logado chega aqui e atualiza a tela automaticamente.
 function iniciarSincronizacaoMunicipios() {
-    if (!firebaseDisponivel || !db || pararSincronizacaoMunicipios) return;
+    if (!firebaseDisponivel || !db) { console.log('[SYNC] Não iniciado: firebaseDisponivel=', firebaseDisponivel, 'db=', !!db); return; }
+    if (pararSincronizacaoMunicipios) { console.log('[SYNC] Listener já estava ativo, ignorando nova chamada'); return; }
 
+    console.log('[SYNC] Iniciando listener em tempo real na coleção "municipios"...');
     pararSincronizacaoMunicipios = db.collection('municipios').onSnapshot((snapshot) => {
         const municipiosAtualizados = {};
         snapshot.forEach(doc => { municipiosAtualizados[doc.id] = doc.data(); });
+        console.log('[SYNC] Snapshot recebido —', Object.keys(municipiosAtualizados).length, 'município(s):', Object.keys(municipiosAtualizados), '| fromCache:', snapshot.metadata.fromCache, '| hasPendingWrites:', snapshot.metadata.hasPendingWrites);
         municipios = municipiosAtualizados;
         localStorage.setItem('municipios', JSON.stringify(municipios)); // cache local
 
@@ -4331,9 +4339,10 @@ function iniciarSincronizacaoMunicipios() {
             atualizarDropdownMunicipios();
             atualizarResumoPrincipal();
             updateLists();
+            console.log('[SYNC] Tela atualizada após snapshot');
         }
     }, (erro) => {
-        console.error('❌ Erro na sincronização com Firestore:', erro);
+        console.error('[SYNC] ❌ Erro na sincronização com Firestore:', erro.code, erro.message);
         showMsg('⚠️ Erro de sincronização: ' + erro.message);
     });
 }
