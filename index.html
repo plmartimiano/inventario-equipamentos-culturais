@@ -5543,11 +5543,11 @@ function startForm(tipo) {
     showTab(tipo);
 }
 
-function saveFormTeatro() {
+async function saveFormTeatro() {
     const n = document.getElementById('teatro-nome').value;
     if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
     if (!dados.teatro) dados.teatro = [];
-    
+
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'teatro' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#teatro input, #teatro textarea, #teatro select').forEach(el => {
@@ -5555,27 +5555,24 @@ function saveFormTeatro() {
             obj[el.id.replace('teatro-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
         }
     });
-    
-    salvarTeatro(obj);
+
+    await salvarTeatro(obj);
 }
 
-function salvarTeatro(obj) {
+async function salvarTeatro(obj) {
     // Se está editando, atualizar; senão adicionar novo
     if (equipamentoEmEdicao.tipo === 'teatro' && equipamentoEmEdicao.id) {
         const indice = dados.teatro.findIndex(e => e.id === equipamentoEmEdicao.id);
         if (indice >= 0) {
             dados.teatro[indice] = obj;
-            showMsg('✓ Teatro atualizado com sucesso!');
         } else {
             dados.teatro.push(obj);
-            showMsg('✓ Teatro Salvo!');
         }
         equipamentoEmEdicao = { tipo: null, id: null };
     } else {
         dados.teatro.push(obj);
-        showMsg('✓ Teatro Salvo!');
     }
-    
+
     saveData();
     updateLists();
     document.querySelectorAll('#teatro input, #teatro textarea').forEach(el => el.value = '');
@@ -5584,38 +5581,39 @@ function salvarTeatro(obj) {
         d.classList.add('campos-desabilitados');
         d.querySelectorAll('input, select').forEach(e => e.disabled = true);
     });
-    // V3.0: Salvar com subpasta + fotos + documentos
-    salvarEquipamentoV3('teatro', obj);
+    // V3.0: Salvar com subpasta + fotos + documentos — aguarda terminar antes de liberar
+    // a navegação, para não permitir reabrir o mesmo equipamento com dados incompletos
+    // (fotos/documentos ainda sendo enviados) e sobrescrever o que já foi salvo.
+    showMsg('⏳ Salvando e enviando fotos/documentos...');
+    await salvarEquipamentoV3('teatro', obj);
+    showMsg('✓ Teatro salvo com sucesso!');
     showTab('menu');
 }
 
-function saveFormAuditorio() {
+async function saveFormAuditorio() {
     const n = document.getElementById('auditorio-nome').value;
     if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
     if (!dados.auditorio) dados.auditorio = [];
-    
+
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'auditorio' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#auditorio input, #auditorio textarea, #auditorio select').forEach(el => {
         if (el.id) obj[el.id.replace('auditorio-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
     });
-    
+
     // Se está editando, atualizar; senão adicionar novo
     if (equipamentoEmEdicao.tipo === 'auditorio' && equipamentoEmEdicao.id) {
         const indice = dados.auditorio.findIndex(e => e.id === equipamentoEmEdicao.id);
         if (indice >= 0) {
             dados.auditorio[indice] = obj;
-            showMsg('✓ Auditório atualizado com sucesso!');
         } else {
             dados.auditorio.push(obj);
-            showMsg('✓ Auditório Salvo!');
         }
         equipamentoEmEdicao = { tipo: null, id: null };
     } else {
         dados.auditorio.push(obj);
-        showMsg('✓ Auditório Salvo!');
     }
-    
+
     saveData();
     updateLists();
     document.querySelectorAll('#auditorio input, #auditorio textarea').forEach(el => el.value = '');
@@ -5624,98 +5622,112 @@ function saveFormAuditorio() {
         d.classList.add('campos-desabilitados');
         d.querySelectorAll('input, select').forEach(e => e.disabled = true);
     });
-    // V3.0: Salvar com subpasta + fotos + documentos
-    salvarEquipamentoV3('auditorio', obj);
+    // V3.0: Salvar com subpasta + fotos + documentos — aguarda terminar antes de liberar
+    // a navegação (evita reabrir o mesmo equipamento com o upload ainda em andamento).
+    showMsg('⏳ Salvando e enviando fotos/documentos...');
+    await salvarEquipamentoV3('auditorio', obj);
+    showMsg('✓ Auditório salvo com sucesso!');
     showTab('menu');
 }
 
-function saveFormCasaCultura() {
+async function saveFormCasaCultura() {
     const n = document.getElementById('casacultura-nome').value;
     if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
     if (!dados.casacultura) dados.casacultura = [];
-    
+
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'casacultura' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#casacultura input, #casacultura textarea, #casacultura select').forEach(el => {
         if (el.id) obj[el.id.replace('casacultura-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
     });
-    dados.casacultura.push(obj);
+
+    if (equipamentoEmEdicao.tipo === 'casacultura' && equipamentoEmEdicao.id) {
+        const indice = dados.casacultura.findIndex(e => e.id === equipamentoEmEdicao.id);
+        if (indice >= 0) {
+            dados.casacultura[indice] = obj;
+        } else {
+            dados.casacultura.push(obj);
+        }
+        equipamentoEmEdicao = { tipo: null, id: null };
+    } else {
+        dados.casacultura.push(obj);
+    }
+
     saveData();
     updateLists();
-    showMsg('✓ Casa de Cultura Salva!');
     document.querySelectorAll('#casacultura input, #casacultura textarea').forEach(el => el.value = '');
     document.querySelectorAll('#casacultura input[type="checkbox"]').forEach(el => el.checked = false);
     document.querySelectorAll('[id^="cc-"][id$="-campos"]').forEach(d => {
         d.classList.add('campos-desabilitados');
         d.querySelectorAll('input, select').forEach(e => e.disabled = true);
     });
-    // V3.0: Salvar com subpasta + fotos + documentos
-    salvarEquipamentoV3('casacultura', obj);
+    // V3.0: Salvar com subpasta + fotos + documentos — aguarda terminar antes de liberar
+    // a navegação (evita reabrir o mesmo equipamento com o upload ainda em andamento).
+    showMsg('⏳ Salvando e enviando fotos/documentos...');
+    await salvarEquipamentoV3('casacultura', obj);
+    showMsg('✓ Casa de Cultura salva com sucesso!');
     showTab('menu');
 }
 
-function saveForm(tipo) {
+async function saveForm(tipo) {
     const n = document.getElementById(tipo + '-nome').value;
     if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
     if (!dados[tipo]) dados[tipo] = [];
-    
+
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === tipo ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
         if (el.id) obj[el.id.replace(tipo + '-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
     });
-    
+
     // Se está editando, atualizar; senão adicionar novo
     if (equipamentoEmEdicao.tipo === tipo && equipamentoEmEdicao.id) {
         const indice = dados[tipo].findIndex(e => e.id === equipamentoEmEdicao.id);
         if (indice >= 0) {
             dados[tipo][indice] = obj;
-            showMsg('✓ Equipamento atualizado com sucesso!');
         } else {
             dados[tipo].push(obj);
-            showMsg('✓ Salvo!');
         }
         equipamentoEmEdicao = { tipo: null, id: null };
     } else {
         dados[tipo].push(obj);
-        showMsg('✓ Salvo!');
     }
-    
+
     saveData();
     updateLists();
     document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea').forEach(el => el.value = '');
-    // V3.0: Salvar com subpasta + fotos + documentos
-    salvarEquipamentoV3(tipo, obj);
+    // V3.0: Salvar com subpasta + fotos + documentos — aguarda terminar antes de liberar
+    // a navegação (evita reabrir o mesmo equipamento com o upload ainda em andamento).
+    showMsg('⏳ Salvando e enviando fotos/documentos...');
+    await salvarEquipamentoV3(tipo, obj);
+    showMsg('✓ Equipamento salvo com sucesso!');
     showTab('menu');
 }
 
-function saveFormGenerico() {
+async function saveFormGenerico() {
     const n = document.getElementById('generico-nome').value;
     if (!n) { showMsg('⚠️ Preencha o nome!'); return; }
     if (!dados.generico) dados.generico = [];
-    
+
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'generico' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#generico input, #generico textarea, #generico select').forEach(el => {
         if (el.id) obj[el.id.replace('generico-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
     });
-    
+
     // Se está editando, atualizar; senão adicionar novo
     if (equipamentoEmEdicao.tipo === 'generico' && equipamentoEmEdicao.id) {
         const indice = dados.generico.findIndex(e => e.id === equipamentoEmEdicao.id);
         if (indice >= 0) {
             dados.generico[indice] = obj;
-            showMsg('✓ Espaço Genérico atualizado com sucesso!');
         } else {
             dados.generico.push(obj);
-            showMsg('✓ Espaço Genérico Salvo!');
         }
         equipamentoEmEdicao = { tipo: null, id: null };
     } else {
         dados.generico.push(obj);
-        showMsg('✓ Espaço Genérico Salvo!');
     }
-    
+
     saveData();
     updateLists();
     document.querySelectorAll('#generico input, #generico textarea').forEach(el => el.value = '');
@@ -5725,8 +5737,11 @@ function saveFormGenerico() {
         d.classList.add('campos-desabilitados');
         d.querySelectorAll('input, select').forEach(e => e.disabled = true);
     });
-    // V3.0: Salvar com subpasta + fotos + documentos
-    salvarEquipamentoV3('generico', obj);
+    // V3.0: Salvar com subpasta + fotos + documentos — aguarda terminar antes de liberar
+    // a navegação (evita reabrir o mesmo equipamento com o upload ainda em andamento).
+    showMsg('⏳ Salvando e enviando fotos/documentos...');
+    await salvarEquipamentoV3('generico', obj);
+    showMsg('✓ Espaço Genérico salvo com sucesso!');
     showTab('menu');
 }
 
