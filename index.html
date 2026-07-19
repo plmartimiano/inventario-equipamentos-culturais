@@ -4514,7 +4514,7 @@ async function uploadDocumento(nomeArquivo, conteudoBase64, subpastaId) {
 // ============================================================
 // GERAR RELATÓRIO PDF
 // ============================================================
-async function gerarRelatorioPDF(tipo, obj, subpastaId) {
+async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], documentosEnviados = []) {
     try {
         console.log('📄 Gerando relatório PDF para:', tipo, obj.nome);
         
@@ -4650,6 +4650,20 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
             display: block;
         }
         .foto-container .legenda { font-size: 10.5px; color: #777; word-break: break-word; }
+        .link-arquivo {
+            display: inline-block;
+            color: #4c46b6;
+            font-size: 10.5px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .link-indisponivel {
+            display: inline-block;
+            color: #aaa;
+            font-size: 10.5px;
+            font-style: italic;
+        }
+        td.nao-respondido { color: #aaa; font-style: italic; }
         .footer {
             margin-top: 10px;
             padding-top: 12px;
@@ -4679,16 +4693,16 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
                 <tr><th>Nome</th><td>${obj.nome || 'N/A'}</td></tr>
         `;
 
-        // Adicionar todos os campos (SEM LIMITE)
+        // Adicionar todos os campos (SEM LIMITE) — campos vazios aparecem como "Não respondido"
         Object.keys(obj).forEach(chave => {
             if (['id', 'nome'].includes(chave)) return;
-            if (!obj[chave] || obj[chave] === '' || obj[chave] === 'N/A') return;
 
             const nomeFormatado = formatarTituloCampo(chave);
-            const valor = String(obj[chave]); // SEM limite de comprimento
+            const preenchido = obj[chave] !== undefined && obj[chave] !== null && obj[chave] !== '' && obj[chave] !== 'N/A';
+            const valor = preenchido ? String(obj[chave]) : 'Não respondido'; // SEM limite de comprimento
 
             htmlRelatorio += `
-                <tr><th>${nomeFormatado}</th><td>${valor}</td></tr>
+                <tr><th>${nomeFormatado}</th><td${preenchido ? '' : ' class="nao-respondido"'}>${valor}</td></tr>
             `;
         });
 
@@ -4697,26 +4711,54 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
         </div>
         `;
 
-        // Adicionar fotos com links
-        if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
+        // Adicionar fotos em miniatura, com link direto para a imagem completa no Drive
+        if (fotosEnviadas && fotosEnviadas.length > 0) {
             htmlRelatorio += `
                 <div class="section">
-                    <h2>📷 Fotos (${fotosTemporarias[tipo].length})</h2>
+                    <h2>📷 Fotos (${fotosEnviadas.length})</h2>
                     <div class="fotos-grid">
             `;
 
-            fotosTemporarias[tipo].forEach((foto, index) => {
+            fotosEnviadas.forEach((foto, index) => {
                 htmlRelatorio += `
                         <div class="foto-container">
                             <span class="badge">Foto ${index + 1}</span>
                             <img src="data:image/jpeg;base64,${foto.base64}" />
                             <p class="legenda">${foto.descricao || foto.nome}</p>
+                            ${foto.link
+                                ? `<a class="link-arquivo" href="${foto.link}">🔗 Ver imagem completa</a>`
+                                : `<span class="link-indisponivel">Link indisponível</span>`}
                         </div>
                 `;
             });
 
             htmlRelatorio += `
                     </div>
+                </div>
+            `;
+        }
+
+        // Adicionar lista de documentos PDF anexados, com link direto para download no Drive
+        if (documentosEnviados && documentosEnviados.length > 0) {
+            htmlRelatorio += `
+                <div class="section">
+                    <h2>📄 Documentos Anexados (${documentosEnviados.length})</h2>
+                    <table class="info-table">
+            `;
+
+            documentosEnviados.forEach((doc) => {
+                htmlRelatorio += `
+                        <tr>
+                            <th>${doc.descricao || doc.nome}</th>
+                            <td>${doc.link
+                                ? `<a class="link-arquivo" href="${doc.link}">⬇️ Baixar do Google Drive</a>`
+                                : `<span class="link-indisponivel">Link indisponível</span>`}</td>
+                        </tr>
+                `;
+            });
+
+            htmlRelatorio += `
+                    </table>
                 </div>
             `;
         }
@@ -4848,33 +4890,46 @@ async function salvarEquipamentoV3(tipo, obj) {
         }
         
         if (subpastaId) {
-            // Upload de fotos
+            // Upload de fotos (guarda o link do Drive de cada uma para usar no relatório)
+            let fotosEnviadas = [];
             if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
                 console.log('📷 Começando upload de', fotosTemporarias[tipo].length, 'fotos');
                 for (const foto of fotosTemporarias[tipo]) {
                     console.log('📤 Uploadando foto:', foto.descricao);
-                    await uploadFoto(`${foto.descricao.replace(/\s+/g, '_')}_${Date.now()}.jpg`, foto.base64, subpastaId);
+                    const resultadoUpload = await uploadFoto(`${foto.descricao.replace(/\s+/g, '_')}_${Date.now()}.jpg`, foto.base64, subpastaId);
+                    fotosEnviadas.push({
+                        descricao: foto.descricao,
+                        nome: foto.nome,
+                        base64: foto.base64,
+                        link: (resultadoUpload && resultadoUpload.sucesso) ? resultadoUpload.link : null
+                    });
                 }
                 fotosTemporarias[tipo] = [];
             } else {
                 console.log('ℹ️ Nenhuma foto para upload');
             }
-            
-            // Upload de documentos
+
+            // Upload de documentos (guarda o link do Drive de cada um para usar no relatório)
+            let documentosEnviados = [];
             if (documentosTemporarios[tipo] && documentosTemporarios[tipo].length > 0) {
                 console.log('📄 Começando upload de', documentosTemporarios[tipo].length, 'documentos');
                 for (const doc of documentosTemporarios[tipo]) {
                     console.log('📤 Uploadando doc:', doc.descricao);
-                    await uploadDocumento(`${doc.descricao.replace(/\s+/g, '_')}_${Date.now()}.pdf`, doc.base64, subpastaId);
+                    const resultadoUpload = await uploadDocumento(`${doc.descricao.replace(/\s+/g, '_')}_${Date.now()}.pdf`, doc.base64, subpastaId);
+                    documentosEnviados.push({
+                        descricao: doc.descricao,
+                        nome: doc.nome,
+                        link: (resultadoUpload && resultadoUpload.sucesso) ? resultadoUpload.link : null
+                    });
                 }
                 documentosTemporarios[tipo] = [];
             } else {
                 console.log('ℹ️ Nenhum documento para upload');
             }
-            
+
             // ✅ GERAR RELATÓRIO PDF
             console.log('📄 Gerando relatório PDF...');
-            await gerarRelatorioPDF(tipo, obj, subpastaId);
+            await gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas, documentosEnviados);
         } else {
             console.error('❌ Não conseguiu criar ou recuperar subpastaId');
         }
