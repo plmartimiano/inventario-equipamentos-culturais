@@ -4548,6 +4548,66 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
             .replace(/_/g, ' ')
             .replace(/\b\w/g, c => c.toUpperCase());
 
+        // Agrupar campos exatamente como o formulário agrupa (cada bloco ".rider-section"
+        // com título em <h4>, alternância Sim/Não e subcampos revelados só quando "Sim")
+        function coletarGruposFormulario() {
+            const grupos = [];
+            const chavesAgrupadas = new Set();
+
+            document.querySelectorAll('#' + tipo + ' .rider-section').forEach(secao => {
+                const tituloEl = secao.querySelector('h4, h3, h5');
+                const simEl = secao.querySelector('input[id$="-sim"]');
+                const naoEl = secao.querySelector('input[id$="-nao"]');
+                if (!tituloEl || (!simEl && !naoEl)) return;
+
+                const titulo = tituloEl.textContent.trim();
+                const idBase = (simEl || naoEl).id;
+                const chaveGrupo = idBase.replace(tipo + '-', '').replace(/-(sim|nao)$/, '');
+
+                const rotulo = (el) => {
+                    if (!el) return null;
+                    const label = document.querySelector(`label[for="${el.id}"]`);
+                    return label ? label.textContent.replace(/[()]/g, '').trim() : null;
+                };
+                const rotuloSim = rotulo(simEl) || 'Sim';
+                const rotuloNao = rotulo(naoEl) || 'Não';
+
+                if (simEl) chavesAgrupadas.add(simEl.id.replace(tipo + '-', ''));
+                if (naoEl) chavesAgrupadas.add(naoEl.id.replace(tipo + '-', ''));
+
+                let status = 'Não respondido';
+                let afirmativo = false;
+                if (simEl && obj[simEl.id.replace(tipo + '-', '')] === 'true') {
+                    status = rotuloSim;
+                    afirmativo = true;
+                } else if (naoEl && obj[naoEl.id.replace(tipo + '-', '')] === 'true') {
+                    status = rotuloNao;
+                }
+
+                const subcampos = [];
+                const camposDiv = document.getElementById(tipo + '-' + chaveGrupo + '-campos');
+                if (camposDiv) {
+                    camposDiv.querySelectorAll('input, select, textarea').forEach(el => {
+                        if (!el.id) return;
+                        const chave = el.id.replace(tipo + '-', '');
+                        chavesAgrupadas.add(chave);
+                        const valor = obj[chave];
+                        if (valor === undefined || valor === null || valor === '' || valor === 'N/A') return;
+                        const labelEl = el.closest('div') ? el.closest('div').querySelector('.rider-label') : null;
+                        const label = labelEl ? labelEl.textContent.trim() : formatarTituloCampo(chave.replace(chaveGrupo + '-', ''));
+                        const valorFormatado = valor === 'true' ? 'Sim' : (valor === 'false' ? 'Não' : valor);
+                        subcampos.push({ label, valor: valorFormatado });
+                    });
+                }
+
+                grupos.push({ titulo, status, afirmativo, subcampos });
+            });
+
+            return { grupos, chavesAgrupadas };
+        }
+
+        const { grupos: gruposFormulario, chavesAgrupadas } = coletarGruposFormulario();
+
         // Criar HTML do relatório com layout pensado para impressão em folha A4
         let htmlRelatorio = `
 <!DOCTYPE html>
@@ -4645,8 +4705,10 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
         }
         .foto-container img {
             width: 100%;
-            height: 165px;
-            object-fit: cover;
+            height: auto;
+            max-height: 260px;
+            object-fit: contain;
+            background: #f4f4fa;
             border-radius: 5px;
             margin-bottom: 6px;
             display: block;
@@ -4666,6 +4728,38 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
             font-style: italic;
         }
         .info-value.nao-respondido { color: #aaa; font-style: italic; }
+        .grupo-lista { width: 100%; }
+        .grupo-item {
+            padding: 8px 10px;
+            page-break-inside: avoid;
+            border-bottom: 1px solid #eceefb;
+        }
+        .grupo-item:nth-child(even) { background: #f7f7fc; }
+        .grupo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        .grupo-titulo { font-size: 11.5px; font-weight: 600; color: #52509a; }
+        .grupo-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 9px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+        .grupo-badge-sim { background: #e3f3e6; color: #21793d; }
+        .grupo-badge-nao { background: #f0f0f0; color: #777; }
+        .grupo-badge-vazio { background: #f0f0f0; color: #aaa; font-style: italic; }
+        .grupo-detalhes {
+            margin-top: 6px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 4px 16px;
+        }
+        .grupo-campo { font-size: 11px; color: #444; }
+        .grupo-campo strong { color: #52509a; font-weight: 600; }
         .footer {
             margin-top: 10px;
             padding-top: 12px;
@@ -4695,9 +4789,10 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
                 <div class="info-row"><div class="info-label">Nome</div><div class="info-value">${obj.nome || 'N/A'}</div></div>
         `;
 
-        // Adicionar todos os campos (SEM LIMITE) — campos vazios aparecem como "Não respondido"
+        // Adicionar campos avulsos (fora dos grupos Sim/Não) — vazios aparecem como "Não respondido"
         Object.keys(obj).forEach(chave => {
             if (['id', 'nome'].includes(chave)) return;
+            if (chavesAgrupadas.has(chave)) return; // já aparece dentro do grupo em "Itens e Equipamentos"
 
             const nomeFormatado = formatarTituloCampo(chave);
             const preenchido = obj[chave] !== undefined && obj[chave] !== null && obj[chave] !== '' && obj[chave] !== 'N/A';
@@ -4713,6 +4808,39 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
             </div>
         </div>
         `;
+
+        // Adicionar itens e equipamentos agrupados, replicando os blocos do formulário
+        if (gruposFormulario.length > 0) {
+            htmlRelatorio += `
+                <div class="section">
+                    <h2>🎛️ Itens e Equipamentos</h2>
+                    <div class="grupo-lista">
+            `;
+
+            gruposFormulario.forEach(grupo => {
+                const classeBadge = grupo.afirmativo ? 'grupo-badge-sim' : (grupo.status === 'Não respondido' ? 'grupo-badge-vazio' : 'grupo-badge-nao');
+                htmlRelatorio += `
+                        <div class="grupo-item">
+                            <div class="grupo-header">
+                                <span class="grupo-titulo">${grupo.titulo}</span>
+                                <span class="grupo-badge ${classeBadge}">${grupo.status}</span>
+                            </div>
+                `;
+                if (grupo.afirmativo && grupo.subcampos.length > 0) {
+                    htmlRelatorio += `<div class="grupo-detalhes">`;
+                    grupo.subcampos.forEach(campo => {
+                        htmlRelatorio += `<div class="grupo-campo"><strong>${campo.label}:</strong> ${campo.valor}</div>`;
+                    });
+                    htmlRelatorio += `</div>`;
+                }
+                htmlRelatorio += `</div>`;
+            });
+
+            htmlRelatorio += `
+                    </div>
+                </div>
+            `;
+        }
 
         // Adicionar fotos em miniatura, com link direto para a imagem completa no Drive
         if (fotosEnviadas && fotosEnviadas.length > 0) {
@@ -4779,13 +4907,42 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
         const element = document.createElement('div');
         element.innerHTML = htmlRelatorio;
 
+        // O html2canvas usa por padrão o tamanho da janela do navegador para seu cálculo
+        // interno de captura. Se o relatório for mais alto que a janela do usuário (comum
+        // em notebooks), o final do conteúdo (documentos, últimas fotos) fica de fora do
+        // PDF. Por isso medimos a altura/largura reais do conteúdo (usando uma cópia
+        // separada, sem alterar o elemento original) e informamos ao html2canvas via
+        // windowWidth/windowHeight.
+        const medidor = document.createElement('div');
+        medidor.style.cssText = 'position:absolute; left:-99999px; top:0;';
+        medidor.appendChild(element.cloneNode(true));
+        document.body.appendChild(medidor);
+        const imagensParaEsperar = Array.from(medidor.querySelectorAll('img'));
+        await Promise.all(imagensParaEsperar.map((img) => img.complete
+            ? Promise.resolve()
+            : new Promise((res) => { img.onload = res; img.onerror = res; })));
+        await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+        const alturaConteudo = medidor.scrollHeight + 100; // margem de segurança
+        const larguraConteudo = medidor.scrollWidth;
+        document.body.removeChild(medidor);
+
         const opt = {
             margin: [14, 12, 18, 12], // topo, esquerda, baixo, direita (mm)
             filename: nomePDF,
             image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, logging: false, useCORS: true },
+            html2canvas: {
+                scale: 2,
+                logging: false,
+                useCORS: true,
+                windowWidth: larguraConteudo,
+                windowHeight: alturaConteudo,
+                scrollX: 0,
+                scrollY: 0,
+                x: 0,
+                y: 0
+            },
             jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true },
-            pagebreak: { mode: ['css', 'avoid-all'], avoid: ['.section', '.foto-container', '.info-row'] }
+            pagebreak: { mode: ['css', 'avoid-all'], avoid: ['.foto-container', '.info-row', '.grupo-item'] }
         };
 
         // Gerar PDF
