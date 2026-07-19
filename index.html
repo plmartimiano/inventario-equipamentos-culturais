@@ -8,6 +8,11 @@
     <!-- Google API Script -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- Firebase (login com Google + banco de dados compartilhado entre aparelhos) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); padding: 10px; }
@@ -63,13 +68,32 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-<div class="container">
+
+<!-- TELA DE LOGIN - visível até o usuário entrar com uma conta Google autorizada -->
+<div id="tela-login" style="position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(135deg, #667eea, #764ba2); z-index:20000; display:flex; align-items:center; justify-content:center; padding:16px;">
+    <div style="background:white; padding:40px 30px; border-radius:12px; max-width:380px; width:100%; text-align:center; box-shadow:0 4px 30px rgba(0,0,0,0.3);">
+        <h1 style="font-size:22px; color:#333; margin-bottom:6px;">🎭 Inventário de Equipamentos Culturais</h1>
+        <p style="color:#666; font-size:13px; margin-bottom:24px;">Faça login para acessar o formulário</p>
+        <button id="btn-login-google" onclick="fazerLoginGoogle()" style="width:100%; padding:12px; background:#fff; color:#333; border:1px solid #ddd; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px;">
+            🔑 Entrar com Google
+        </button>
+        <p id="login-carregando" style="color:#666; font-size:13px; margin-top:16px; display:none;">⏳ Verificando acesso...</p>
+        <p id="login-msg" style="color:#dc3545; font-size:13px; margin-top:16px; font-weight:600;"></p>
+    </div>
+</div>
+
+<div class="container" id="app-container" style="display:none;">
     <header>
         <h1>🎭 Inventário de Equipamentos Culturais</h1>
         <p class="subtitle">Mapeamento de Espaços Culturais</p>
         <!-- Indicador de Município Atual -->
         <div id="municipio-indicador" style="background: #f0f8ff; padding: 8px 12px; border-radius: 6px; margin-top: 10px; text-align: center; font-weight: 600; color: #667eea; font-size: 14px; display: none;">
             📍 Município: <span id="municipio-nome-indicador"></span>
+        </div>
+        <!-- Indicador de Usuário Logado -->
+        <div id="usuario-logado-indicador" style="display:none; align-items:center; justify-content:space-between; background:#f0f8ff; padding:6px 12px; border-radius:6px; margin-top:8px; font-size:12px; color:#555;">
+            <span>👤 <span id="usuario-logado-email"></span></span>
+            <button onclick="fazerLogout()" style="background:none; border:none; color:#667eea; font-weight:700; cursor:pointer; font-size:12px; padding:4px 8px;">Sair</button>
         </div>
     </header>
 
@@ -4174,6 +4198,183 @@ const SERVIDOR_URL = 'https://inventario-equipamentos-paulo.vercel.app';
 let googleAuthToken = null;
 let pastasMunicipio = {}; // { 'rio-claro': 'ID_DA_PASTA', ... }
 
+// ============================================================
+// FIREBASE - LOGIN COM GOOGLE + BANCO DE DADOS COMPARTILHADO
+// ============================================================
+// Antes desta funcionalidade, os dados do formulário (municipios/equipamentos) só
+// existiam no localStorage — ou seja, no navegador de quem preencheu, sem nenhum
+// aparelho conseguir ver o que outro salvou. Agora eles vivem no Firestore (um
+// documento por município, na coleção "municipios"), sincronizados em tempo real
+// para todo aparelho logado com uma conta Google autorizada.
+const firebaseConfig = {
+    apiKey: "AIzaSyBLRoi3OTo3dRZdZg2EGyGGNXfRf_rMdLE",
+    authDomain: "inventario-equipamentos.firebaseapp.com",
+    projectId: "inventario-equipamentos",
+    storageBucket: "inventario-equipamentos.firebasestorage.app",
+    messagingSenderId: "773414291924",
+    appId: "1:773414291924:web:5668679360b35a52022e41"
+};
+
+const firebaseDisponivel = typeof firebase !== 'undefined';
+let auth = null;
+let db = null;
+let usuarioAtual = null;
+let pararSincronizacaoMunicipios = null;
+let primeiraSincronizacaoRecebida = false;
+
+if (firebaseDisponivel) {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+} else {
+    console.error('❌ SDK do Firebase não carregou (sem conexão com a internet?)');
+}
+
+function fazerLoginGoogle() {
+    if (!firebaseDisponivel) {
+        document.getElementById('login-msg').textContent = '⚠️ Não foi possível carregar o sistema de login. Verifique sua conexão com a internet e recarregue a página.';
+        return;
+    }
+    document.getElementById('login-msg').textContent = '';
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(erro => {
+        console.error('❌ Erro no login:', erro);
+        document.getElementById('login-msg').textContent = '⚠️ Erro ao entrar: ' + erro.message;
+    });
+}
+
+function fazerLogout() {
+    if (pararSincronizacaoMunicipios) {
+        pararSincronizacaoMunicipios();
+        pararSincronizacaoMunicipios = null;
+    }
+    primeiraSincronizacaoRecebida = false;
+    if (auth) auth.signOut();
+}
+
+function mostrarTelaLogin() {
+    document.getElementById('tela-login').style.display = 'flex';
+    document.getElementById('app-container').style.display = 'none';
+}
+
+function esconderTelaLoginEMostrarApp() {
+    document.getElementById('tela-login').style.display = 'none';
+    document.getElementById('app-container').style.display = 'block';
+    const indicador = document.getElementById('usuario-logado-indicador');
+    if (indicador && usuarioAtual) {
+        indicador.style.display = 'flex';
+        document.getElementById('usuario-logado-email').textContent = usuarioAtual.email;
+    }
+}
+
+// Remove recursivamente campos "undefined" de um objeto/array — o Firestore rejeita
+// gravações que contenham "undefined" em qualquer campo (ex: pastaId ainda não
+// definido num município recém-criado), então limpamos antes de gravar.
+function removerUndefinedRecursivo(valor) {
+    if (Array.isArray(valor)) {
+        return valor.map(removerUndefinedRecursivo);
+    }
+    if (valor && typeof valor === 'object') {
+        const limpo = {};
+        Object.keys(valor).forEach(chave => {
+            if (valor[chave] === undefined) return;
+            limpo[chave] = removerUndefinedRecursivo(valor[chave]);
+        });
+        return limpo;
+    }
+    return valor;
+}
+
+// Grava todos os municípios em memória no Firestore compartilhado (um documento por
+// município). Chamada pelo saveData(), que continua também gravando no localStorage
+// como cache local — assim o app continua funcionando (em modo só-leitura do último
+// estado conhecido) mesmo numa queda momentânea de conexão.
+async function sincronizarMunicipiosParaFirestore() {
+    if (!firebaseDisponivel || !db || !usuarioAtual) return;
+    try {
+        const lote = db.batch();
+        Object.keys(municipios).forEach(chave => {
+            const ref = db.collection('municipios').doc(chave);
+            lote.set(ref, removerUndefinedRecursivo(municipios[chave]));
+        });
+        await lote.commit();
+    } catch (erro) {
+        console.error('❌ Erro ao sincronizar com Firestore:', erro);
+        showMsg('⚠️ Erro ao sincronizar dados com o servidor: ' + erro.message);
+    }
+}
+
+// Ouve em tempo real a coleção "municipios" no Firestore — qualquer alteração feita
+// por qualquer aparelho logado chega aqui e atualiza a tela automaticamente.
+function iniciarSincronizacaoMunicipios() {
+    if (!firebaseDisponivel || !db || pararSincronizacaoMunicipios) return;
+
+    pararSincronizacaoMunicipios = db.collection('municipios').onSnapshot((snapshot) => {
+        const municipiosAtualizados = {};
+        snapshot.forEach(doc => { municipiosAtualizados[doc.id] = doc.data(); });
+        municipios = municipiosAtualizados;
+        localStorage.setItem('municipios', JSON.stringify(municipios)); // cache local
+
+        if (!primeiraSincronizacaoRecebida) {
+            primeiraSincronizacaoRecebida = true;
+            loadData();
+        } else {
+            if (municipioAtual && !municipios[municipioAtual]) {
+                // O município selecionado neste aparelho foi apagado em outro lugar
+                municipioAtual = null;
+                dados = {};
+                ocultarAbasEquipamentos();
+                limparFormularioMunicipio();
+            } else if (municipioAtual && municipios[municipioAtual]) {
+                dados = municipios[municipioAtual].equipamentos || {};
+            }
+            atualizarDropdownMunicipios();
+            atualizarResumoPrincipal();
+            updateLists();
+        }
+    }, (erro) => {
+        console.error('❌ Erro na sincronização com Firestore:', erro);
+        showMsg('⚠️ Erro de sincronização: ' + erro.message);
+    });
+}
+
+if (firebaseDisponivel) {
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            usuarioAtual = null;
+            mostrarTelaLogin();
+            return;
+        }
+
+        const email = user.email.toLowerCase();
+        document.getElementById('login-msg').textContent = '';
+        document.getElementById('login-carregando').style.display = 'block';
+
+        try {
+            const doc = await db.collection('usuarios_autorizados').doc(email).get();
+            if (!doc.exists) {
+                document.getElementById('login-carregando').style.display = 'none';
+                document.getElementById('login-msg').textContent = '⚠️ O e-mail ' + user.email + ' não tem acesso autorizado. Peça liberação ao administrador.';
+                await auth.signOut();
+                return;
+            }
+        } catch (erro) {
+            console.error('❌ Erro ao verificar autorização:', erro);
+            document.getElementById('login-carregando').style.display = 'none';
+            document.getElementById('login-msg').textContent = '⚠️ Erro ao verificar autorização: ' + erro.message;
+            await auth.signOut();
+            return;
+        }
+
+        usuarioAtual = user;
+        document.getElementById('login-carregando').style.display = 'none';
+        esconderTelaLoginEMostrarApp();
+        iniciarSincronizacaoMunicipios();
+    });
+} else {
+    document.getElementById('login-msg') && (document.getElementById('login-msg').textContent = '⚠️ Não foi possível carregar o sistema de login. Verifique sua conexão com a internet e recarregue a página.');
+}
+
 // ===== FUNÇÕES GOOGLE DRIVE =====
 
 // Criar pasta para município no Google Drive
@@ -5474,19 +5675,11 @@ function toggleCampos(id) {
     }
 }
 
+// Chamada uma única vez, logo após a primeira sincronização com o Firestore chegar
+// (ver iniciarSincronizacaoMunicipios) — nesse ponto "municipios" já está populado
+// com os dados compartilhados vindos do servidor, não mais do localStorage.
 function loadData() {
-    // Carregar estrutura de municípios
-    const s = localStorage.getItem('municipios');
-    if (s) {
-        try {
-            municipios = JSON.parse(s);
-        } catch(e) {
-            console.warn('Erro ao carregar municipios:', e);
-            municipios = {};
-        }
-    }
-    
-    // Compatibilidade com dados antigos (espacos)
+    // Compatibilidade com dados antigos (espacos), de versões anteriores ao Firestore
     const old = localStorage.getItem('espacos');
     if (old && Object.keys(municipios).length === 0) {
         console.warn('Dados antigos detectados. Migrando...');
@@ -5506,27 +5699,31 @@ function loadData() {
         localStorage.removeItem('espacos');
         saveData();
     }
-    
+
     // Se houver municípios, selecionar o primeiro
     const chaves = Object.keys(municipios);
     if (chaves.length > 0) {
         municipioAtual = chaves[0];
         localStorage.setItem('municipioAtual', municipioAtual); // ✅ Salvar no localStorage
         carregarDadosMunicipio();
+        loadMunicipio();
         mostrarAbasEquipamentos(); // MOSTRAR ABAS
     } else {
         ocultarAbasEquipamentos(); // OCULTAR ABAS
     }
-    
+
     // Atualizar UI
     atualizarDropdownMunicipios();
     atualizarResumoPrincipal();
     updateLists();
 }
 
+// Salva a estrutura completa de municípios: no localStorage (cache local, usado como
+// fallback caso a conexão caia) e no Firestore (fonte compartilhada — é isso que faz
+// outros aparelhos/usuários verem o que foi preenchido aqui).
 function saveData() {
-    // Salvar estrutura completa de municípios
     localStorage.setItem('municipios', JSON.stringify(municipios));
+    sincronizarMunicipiosParaFirestore();
 }
 
 function mostrarAbasEquipamentos() {
@@ -6287,6 +6484,17 @@ async function deletarMunicipioConfirmado(chave) {
     delete municipios[chave];
     delete pastasMunicipio[chaveMunicipio];
     localStorage.setItem('pastasMunicipio', JSON.stringify(pastasMunicipio));
+    // saveData() só regrava os municípios que ainda existem no objeto local — como este
+    // já foi removido de "municipios" acima, é preciso apagar o documento dele no
+    // Firestore explicitamente, senão ele ficaria órfão lá (voltando a aparecer para
+    // outros aparelhos na próxima sincronização).
+    if (firebaseDisponivel && db) {
+        try {
+            await db.collection('municipios').doc(chave).delete();
+        } catch (erroFirestore) {
+            console.error('❌ Erro ao remover município do Firestore compartilhado:', erroFirestore);
+        }
+    }
     saveData();
     municipioAtual = null;
     dados = {};
@@ -6301,11 +6509,12 @@ async function deletarMunicipioConfirmado(chave) {
 
 // Aguardar DOM estar pronto antes de carregar dados
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== INICIALIZAÇÃO: Carregar dados do localStorage =====
-    loadMunicipio();
-    loadData();
-    carregarPastasMunicipio(); // Carregar pastas do Google Drive
-    
+    // ===== INICIALIZAÇÃO =====
+    // O carregamento de municípios/equipamentos agora depende do login: loadData()
+    // só é chamado depois que o usuário entra com uma conta Google autorizada e a
+    // primeira sincronização com o Firestore chega (ver iniciarSincronizacaoMunicipios).
+    carregarPastasMunicipio(); // Carregar pastas do Google Drive (independente do login)
+
     // ===== EVENT LISTENERS DOS BOTÕES DO MODAL =====
     const btnCancelar = document.getElementById('modal-cancelar');
     const btnConfirmar = document.getElementById('modal-confirmar-btn');
