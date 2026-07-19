@@ -932,6 +932,7 @@
             </div>
 
             <button class="btn btn-success" data-onclick="saveFormTeatro()">✓ SALVAR TEATRO</button>
+            <button class="btn btn-primary" data-onclick="baixarRelatorioAtual('teatro')">⬇️ BAIXAR RELATÓRIO</button>
         </div>
     </div>
 
@@ -1566,6 +1567,7 @@
             </div>
             
             <button class="btn btn-success" data-onclick="saveFormAuditorio()">✓ SALVAR AUDITÓRIO</button>
+            <button class="btn btn-primary" data-onclick="baixarRelatorioAtual('auditorio')">⬇️ BAIXAR RELATÓRIO</button>
         </div>
     </div>
 
@@ -2152,6 +2154,7 @@
             </div>
 
             <button class="btn btn-success" data-onclick="saveFormCasaCultura()">✓ SALVAR CASA DE CULTURA</button>
+            <button class="btn btn-primary" data-onclick="baixarRelatorioAtual('casacultura')">⬇️ BAIXAR RELATÓRIO</button>
         </div>
     </div>
 
@@ -2604,6 +2607,7 @@
             <div class="form-group"><label>Descrição Geral da Praça</label><textarea id="praca-desc-geral" placeholder="Histórico, restrições legais, tombamentos, observações de zeladoria, etc."></textarea></div>
 
             <button class="btn btn-success" data-onclick="saveForm('praca')">✓ SALVAR PRAÇA</button>
+            <button class="btn btn-primary" data-onclick="baixarRelatorioAtual('praca')">⬇️ BAIXAR RELATÓRIO</button>
         </div>
     </div>
 
@@ -3221,6 +3225,7 @@
             </div>
 
             <button class="btn btn-success" data-onclick="saveForm('biblioteca')">✓ SALVAR BIBLIOTECA</button>
+            <button class="btn btn-primary" data-onclick="baixarRelatorioAtual('biblioteca')">⬇️ BAIXAR RELATÓRIO</button>
         </div>
     </div>
 
@@ -3662,6 +3667,7 @@
             <div class="form-group"><label>Observações Gerais e Recomendações</label><textarea id="ginasio-desc-geral" placeholder="Condições especiais, restrições de uso, eventos anteriores, etc."></textarea></div>
 
             <button class="btn btn-success" data-onclick="saveForm('ginasio')">✓ SALVAR GINÁSIO</button>
+            <button class="btn btn-primary" data-onclick="baixarRelatorioAtual('ginasio')">⬇️ BAIXAR RELATÓRIO</button>
         </div>
     </div>
 </div>
@@ -4144,6 +4150,7 @@
             </div>
 
             <button class="btn btn-success" data-onclick="saveFormGenerico()">✓ SALVAR ESPAÇO GENÉRICO</button>
+            <button class="btn btn-primary" data-onclick="baixarRelatorioAtual('generico')">⬇️ BAIXAR RELATÓRIO</button>
         </div>
     </div>
 
@@ -4579,7 +4586,8 @@ async function uploadDocumento(nomeArquivo, conteudoBase64, subpastaId) {
 // ============================================================
 // GERAR RELATÓRIO PDF
 // ============================================================
-async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], documentosEnviados = []) {
+async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], documentosEnviados = [], opcoes = {}) {
+    const { baixar = false, enviarDrive = true } = opcoes;
     try {
         console.log('📄 Gerando relatório PDF para:', tipo, obj.nome);
         
@@ -5054,11 +5062,21 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
                     pdf.text(`Página ${i} de ${totalPaginas}`, largura - 12, altura - 8, { align: 'right' });
                 }
 
-                // Converter PDF para base64
-                const pdfBase64 = pdf.output('dataurlstring').split(',')[1];
                 console.log('✅ PDF gerado com sucesso');
 
-                // Upload do PDF para Google Drive
+                // Baixa o PDF direto no navegador do usuário, além de (ou em vez de) enviar
+                // ao Drive — usado pelo botão "Baixar Relatório" nos formulários.
+                if (baixar) {
+                    pdf.save(nomePDF);
+                }
+
+                if (!enviarDrive) {
+                    resolve({ sucesso: true, apenasDownload: true });
+                    return;
+                }
+
+                // Converter PDF para base64 e enviar ao Google Drive
+                const pdfBase64 = pdf.output('dataurlstring').split(',')[1];
                 uploadPDF(nomePDF, pdfBase64, subpastaId).then(resultado => {
                     console.log('📤 PDF enviado para Google Drive:', nomePDF);
                     resolve(resultado);
@@ -5104,6 +5122,36 @@ async function uploadPDF(nomeArquivo, conteudoBase64, subpastaId) {
         console.error('❌ Erro uploadPDF:', erro.message);
         return { sucesso: false, erro: erro.message };
     }
+}
+
+// Baixa localmente, no navegador, o mesmo relatório PDF gerado ao salvar (mesma
+// formatação, mesma função geradora), refletindo o estado atual do formulário: campos
+// preenchidos agora + fotos/documentos já salvos anteriormente + fotos/documentos ainda
+// pendentes de envio nesta sessão — sem precisar salvar antes para poder baixar.
+async function baixarRelatorioAtual(tipo) {
+    const nomeEl = document.getElementById(tipo + '-nome');
+    const nome = nomeEl ? nomeEl.value.trim() : '';
+    if (!nome) { showMsg('⚠️ Preencha o nome antes de baixar o relatório!'); return; }
+
+    let obj = { id: equipamentoEmEdicao.tipo === tipo ? equipamentoEmEdicao.id : Date.now(), nome: nome };
+    document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
+        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
+            obj[el.id.replace(tipo + '-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        }
+    });
+
+    const todasFotos = [
+        ...(fotosExistentes[tipo] || []),
+        ...(fotosTemporarias[tipo] || []).map(f => ({ descricao: f.descricao, nome: f.nome, base64: f.thumbBase64, largura: f.largura, altura: f.altura, link: null }))
+    ];
+    const todosDocumentos = [
+        ...(documentosExistentes[tipo] || []),
+        ...(documentosTemporarios[tipo] || []).map(d => ({ descricao: d.descricao, nome: d.nome, link: null }))
+    ];
+
+    showMsg('⏳ Gerando relatório para download...');
+    await gerarRelatorioPDF(tipo, obj, null, todasFotos, todosDocumentos, { baixar: true, enviarDrive: false });
+    showMsg('✓ Relatório baixado!');
 }
 
 // Salvar Equipamento V3 (com subpasta + uploads)
