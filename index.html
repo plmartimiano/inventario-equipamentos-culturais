@@ -4530,83 +4530,132 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
         const dataHora = `${dia}_${mes}_${ano}_${horas}h${minutos}m${segundos}s`;
         const nomePDF = `${tipo}_${obj.nome.replace(/\s+/g, '_')}_${dataHora}.pdf`;
         
-        // Criar HTML do relatório com formatação melhorada
+        // Mapear tipo -> nome amigável e ícone
+        const TIPO_INFO = {
+            teatro: { nome: 'Teatro', icone: '🎭' },
+            auditorio: { nome: 'Auditório', icone: '🎤' },
+            casacultura: { nome: 'Casa de Cultura', icone: '🏛️' },
+            praca: { nome: 'Praça', icone: '🏞️' },
+            biblioteca: { nome: 'Biblioteca', icone: '📚' },
+            ginasio: { nome: 'Ginásio', icone: '🏀' },
+            generico: { nome: 'Equipamento Cultural', icone: '🏢' }
+        };
+        const infoTipo = TIPO_INFO[tipo] || { nome: tipo.toUpperCase(), icone: '📋' };
+        const nomeMunicipio = (municipioAtual && municipios[municipioAtual]) ? municipios[municipioAtual].nome : '';
+
+        // Formatar nome de campo em Título Legível (mais amigável que MAIÚSCULO)
+        const formatarTituloCampo = (chave) => chave
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, c => c.toUpperCase());
+
+        // Criar HTML do relatório com layout pensado para impressão em folha A4
         let htmlRelatorio = `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <style>
-        * { margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { padding: 15px; max-width: 900px; }
-        .header { 
-            text-align: center; 
-            border-bottom: 3px solid #667eea; 
-            margin-bottom: 25px; 
-            padding-bottom: 15px;
-        }
-        .header h1 { font-size: 28px; color: #667eea; margin: 0; }
-        .section { 
-            margin: 25px 0; 
-            padding: 15px; 
-            background: #f8f9ff; 
-            border-left: 4px solid #667eea;
-            page-break-inside: avoid;
-        }
-        .section h2 { 
-            font-size: 18px; 
-            color: #667eea; 
-            margin-bottom: 15px; 
-            border-bottom: 2px solid #e0e0e0;
-            padding-bottom: 8px;
-        }
-        .info-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 12px; 
-            margin: 10px 0;
-        }
-        .info-item { 
-            padding: 8px; 
-            background: white; 
-            border-radius: 3px; 
-            border-left: 3px solid #667eea;
-        }
-        .info-item strong { color: #667eea; display: block; margin-bottom: 3px; }
-        .info-item span { color: #555; }
-        .foto-container {
-            margin: 20px 0;
-            padding: 15px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            page-break-inside: avoid;
-        }
-        .foto-container h3 { 
-            color: #555; 
-            margin-bottom: 10px; 
-            font-size: 14px;
-        }
-        .foto-container img { 
-            max-width: 100%; 
-            height: auto; 
-            max-height: 300px;
-            border-radius: 3px;
-            margin-bottom: 10px;
-        }
-        .foto-link {
-            color: #667eea;
-            text-decoration: none;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
             font-size: 12px;
-            word-break: break-all;
+            line-height: 1.55;
+            color: #333;
         }
-        .footer {
-            margin-top: 30px;
-            padding-top: 15px;
-            border-top: 2px solid #ddd;
-            text-align: center;
+        .container { width: 100%; }
+        .header {
+            background: linear-gradient(135deg, #667eea, #5a4fcf);
+            color: #fff;
+            border-radius: 8px;
+            padding: 20px 22px;
+            margin-bottom: 22px;
+        }
+        .header .icone { font-size: 30px; line-height: 1; margin-bottom: 6px; }
+        .header h1 { font-size: 21px; font-weight: 600; margin: 0 0 3px; }
+        .header .subtitulo { font-size: 13px; opacity: 0.92; }
+        .header .meta {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.35);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 22px;
             font-size: 11px;
+            opacity: 0.95;
+        }
+        .section {
+            background: #fff;
+            border: 1px solid #e4e4f0;
+            border-radius: 8px;
+            padding: 16px 18px;
+            margin-bottom: 18px;
+            page-break-inside: avoid;
+        }
+        .section h2 {
+            font-size: 14px;
+            color: #4c46b6;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eceefb;
+        }
+        table.info-table { width: 100%; border-collapse: collapse; }
+        table.info-table tr { page-break-inside: avoid; }
+        table.info-table tr:nth-child(even) { background: #f7f7fc; }
+        table.info-table th {
+            width: 34%;
+            text-align: left;
+            vertical-align: top;
+            padding: 7px 10px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #52509a;
+            border-bottom: 1px solid #eceefb;
+        }
+        table.info-table td {
+            vertical-align: top;
+            padding: 7px 10px;
+            font-size: 11.5px;
+            color: #333;
+            border-bottom: 1px solid #eceefb;
+            word-break: break-word;
+        }
+        .fotos-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .foto-container {
+            background: #fff;
+            border: 1px solid #e4e4f0;
+            border-radius: 8px;
+            padding: 10px;
+            page-break-inside: avoid;
+        }
+        .foto-container .badge {
+            display: inline-block;
+            background: #667eea;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+        .foto-container img {
+            width: 100%;
+            height: 165px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-bottom: 6px;
+            display: block;
+        }
+        .foto-container .legenda { font-size: 10.5px; color: #777; word-break: break-word; }
+        .footer {
+            margin-top: 10px;
+            padding-top: 12px;
+            border-top: 1px solid #e4e4e4;
+            text-align: center;
+            font-size: 10px;
             color: #999;
         }
     </style>
@@ -4614,96 +4663,104 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId) {
 <body>
     <div class="container">
         <div class="header">
-            <h1>📋 Relatório - ${tipo.toUpperCase()}</h1>
+            <div class="icone">${infoTipo.icone}</div>
+            <h1>${infoTipo.nome}${obj.nome ? ' — ' + obj.nome : ''}</h1>
+            <div class="subtitulo">Relatório de Inventário de Equipamento Cultural</div>
+            <div class="meta">
+                ${nomeMunicipio ? `<span>📍 Município: <strong>${nomeMunicipio}</strong></span>` : ''}
+                <span>🗓️ Data: <strong>${dia}/${mes}/${ano}</strong></span>
+                <span>🕐 Hora: <strong>${horas}:${minutos}:${segundos}</strong></span>
+            </div>
         </div>
-        
+
         <div class="section">
-            <h2>📌 Identificação</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <strong>Nome:</strong>
-                    <span>${obj.nome || 'N/A'}</span>
-                </div>
-                <div class="info-item">
-                    <strong>Data/Hora:</strong>
-                    <span>${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}</span>
-                </div>
+            <h2>📌 Dados do Equipamento</h2>
+            <table class="info-table">
+                <tr><th>Nome</th><td>${obj.nome || 'N/A'}</td></tr>
         `;
-        
+
         // Adicionar todos os campos (SEM LIMITE)
         Object.keys(obj).forEach(chave => {
             if (['id', 'nome'].includes(chave)) return;
             if (!obj[chave] || obj[chave] === '' || obj[chave] === 'N/A') return;
-            
-            const nomeFormatado = chave.replace(/_/g, ' ').toUpperCase();
+
+            const nomeFormatado = formatarTituloCampo(chave);
             const valor = String(obj[chave]); // SEM limite de comprimento
-            
+
             htmlRelatorio += `
-                <div class="info-item">
-                    <strong>${nomeFormatado}:</strong>
-                    <span>${valor}</span>
-                </div>
+                <tr><th>${nomeFormatado}</th><td>${valor}</td></tr>
             `;
         });
-        
+
         htmlRelatorio += `
-            </div>
+            </table>
         </div>
         `;
-        
+
         // Adicionar fotos com links
         if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
             htmlRelatorio += `
                 <div class="section">
                     <h2>📷 Fotos (${fotosTemporarias[tipo].length})</h2>
+                    <div class="fotos-grid">
             `;
-            
+
             fotosTemporarias[tipo].forEach((foto, index) => {
                 htmlRelatorio += `
-                    <div class="foto-container">
-                        <h3>📸 Foto ${index + 1}: ${foto.descricao}</h3>
-                        <img src="data:image/jpeg;base64,${foto.base64}" />
-                        <p style="font-size: 11px; color: #999; margin: 5px 0;">
-                            Arquivo: ${foto.nome}
-                        </p>
-                    </div>
+                        <div class="foto-container">
+                            <span class="badge">Foto ${index + 1}</span>
+                            <img src="data:image/jpeg;base64,${foto.base64}" />
+                            <p class="legenda">${foto.descricao || foto.nome}</p>
+                        </div>
                 `;
             });
-            
-            htmlRelatorio += `</div>`;
+
+            htmlRelatorio += `
+                    </div>
+                </div>
+            `;
         }
-        
+
         htmlRelatorio += `
             <div class="footer">
-                <p>📁 Equipamento: ${tipo.toUpperCase()}</p>
-                <p>🕐 Gerado em: ${dia}/${mes}/${ano} às ${horas}:${minutos}:${segundos}</p>
-                <p>✅ Relatório gerado automaticamente pelo Sistema de Inventário</p>
+                <p>Sistema de Inventário de Equipamentos Culturais — Relatório gerado automaticamente</p>
             </div>
         </div>
     </body>
 </html>
         `;
-        
-        // Gerar PDF usando html2pdf
+
+        // Gerar PDF usando html2pdf, formatado para folha A4 com margens confortáveis
         const element = document.createElement('div');
         element.innerHTML = htmlRelatorio;
-        
+
         const opt = {
-            margin: 5,
+            margin: [14, 12, 18, 12], // topo, esquerda, baixo, direita (mm)
             filename: nomePDF,
             image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, logging: false },
-            jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' },
-            pagebreak: { mode: 'avoid-all', before: '.page-break' }
+            html2canvas: { scale: 2, logging: false, useCORS: true },
+            jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true },
+            pagebreak: { mode: ['css', 'avoid-all'], avoid: ['.section', '.foto-container', 'tr'] }
         };
-        
+
         // Gerar PDF
         return new Promise((resolve) => {
             html2pdf().set(opt).from(element).toPdf().get('pdf').then((pdf) => {
+                // Adicionar numeração de página no rodapé de cada folha
+                const totalPaginas = pdf.internal.getNumberOfPages();
+                const largura = pdf.internal.pageSize.getWidth();
+                const altura = pdf.internal.pageSize.getHeight();
+                for (let i = 1; i <= totalPaginas; i++) {
+                    pdf.setPage(i);
+                    pdf.setFontSize(8);
+                    pdf.setTextColor(150);
+                    pdf.text(`Página ${i} de ${totalPaginas}`, largura - 12, altura - 8, { align: 'right' });
+                }
+
                 // Converter PDF para base64
                 const pdfBase64 = pdf.output('dataurlstring').split(',')[1];
                 console.log('✅ PDF gerado com sucesso');
-                
+
                 // Upload do PDF para Google Drive
                 uploadPDF(nomePDF, pdfBase64, subpastaId).then(resultado => {
                     console.log('📤 PDF enviado para Google Drive:', nomePDF);
