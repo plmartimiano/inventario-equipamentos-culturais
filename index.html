@@ -4562,7 +4562,7 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
             line-height: 1.55;
             color: #333;
         }
-        .container { width: 100%; }
+        .container { width: 700px; }
         .header {
             background: linear-gradient(135deg, #667eea, #5a4fcf);
             color: #fff;
@@ -4598,25 +4598,27 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
             padding-bottom: 8px;
             border-bottom: 1px solid #eceefb;
         }
-        table.info-table { width: 100%; border-collapse: collapse; }
-        table.info-table tr { page-break-inside: avoid; }
-        table.info-table tr:nth-child(even) { background: #f7f7fc; }
-        table.info-table th {
+        .info-table { width: 100%; }
+        .info-row {
+            display: flex;
+            page-break-inside: avoid;
+            border-bottom: 1px solid #eceefb;
+        }
+        .info-row:nth-child(even) { background: #f7f7fc; }
+        .info-row .info-label {
             width: 34%;
+            flex-shrink: 0;
             text-align: left;
-            vertical-align: top;
             padding: 7px 10px;
             font-size: 11.5px;
             font-weight: 600;
             color: #52509a;
-            border-bottom: 1px solid #eceefb;
         }
-        table.info-table td {
-            vertical-align: top;
+        .info-row .info-value {
+            flex: 1;
             padding: 7px 10px;
             font-size: 11.5px;
             color: #333;
-            border-bottom: 1px solid #eceefb;
             word-break: break-word;
         }
         .fotos-grid {
@@ -4663,7 +4665,7 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
             font-size: 10.5px;
             font-style: italic;
         }
-        td.nao-respondido { color: #aaa; font-style: italic; }
+        .info-value.nao-respondido { color: #aaa; font-style: italic; }
         .footer {
             margin-top: 10px;
             padding-top: 12px;
@@ -4689,8 +4691,8 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
 
         <div class="section">
             <h2>📌 Dados do Equipamento</h2>
-            <table class="info-table">
-                <tr><th>Nome</th><td>${obj.nome || 'N/A'}</td></tr>
+            <div class="info-table">
+                <div class="info-row"><div class="info-label">Nome</div><div class="info-value">${obj.nome || 'N/A'}</div></div>
         `;
 
         // Adicionar todos os campos (SEM LIMITE) — campos vazios aparecem como "Não respondido"
@@ -4699,15 +4701,16 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
 
             const nomeFormatado = formatarTituloCampo(chave);
             const preenchido = obj[chave] !== undefined && obj[chave] !== null && obj[chave] !== '' && obj[chave] !== 'N/A';
-            const valor = preenchido ? String(obj[chave]) : 'Não respondido'; // SEM limite de comprimento
+            const valorBruto = obj[chave] === 'true' ? 'Sim' : (obj[chave] === 'false' ? 'Não' : obj[chave]);
+            const valor = preenchido ? String(valorBruto) : 'Não respondido'; // SEM limite de comprimento
 
             htmlRelatorio += `
-                <tr><th>${nomeFormatado}</th><td${preenchido ? '' : ' class="nao-respondido"'}>${valor}</td></tr>
+                <div class="info-row"><div class="info-label">${nomeFormatado}</div><div class="info-value${preenchido ? '' : ' nao-respondido'}">${valor}</div></div>
             `;
         });
 
         htmlRelatorio += `
-            </table>
+            </div>
         </div>
         `;
 
@@ -4743,22 +4746,22 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
             htmlRelatorio += `
                 <div class="section">
                     <h2>📄 Documentos Anexados (${documentosEnviados.length})</h2>
-                    <table class="info-table">
+                    <div class="info-table">
             `;
 
             documentosEnviados.forEach((doc) => {
                 htmlRelatorio += `
-                        <tr>
-                            <th>${doc.descricao || doc.nome}</th>
-                            <td>${doc.link
+                        <div class="info-row">
+                            <div class="info-label">${doc.descricao || doc.nome}</div>
+                            <div class="info-value">${doc.link
                                 ? `<a class="link-arquivo" href="${doc.link}">⬇️ Baixar do Google Drive</a>`
-                                : `<span class="link-indisponivel">Link indisponível</span>`}</td>
-                        </tr>
+                                : `<span class="link-indisponivel">Link indisponível</span>`}</div>
+                        </div>
                 `;
             });
 
             htmlRelatorio += `
-                    </table>
+                    </div>
                 </div>
             `;
         }
@@ -4782,7 +4785,7 @@ async function gerarRelatorioPDF(tipo, obj, subpastaId, fotosEnviadas = [], docu
             image: { type: 'jpeg', quality: 0.95 },
             html2canvas: { scale: 2, logging: false, useCORS: true },
             jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true },
-            pagebreak: { mode: ['css', 'avoid-all'], avoid: ['.section', '.foto-container', 'tr'] }
+            pagebreak: { mode: ['css', 'avoid-all'], avoid: ['.section', '.foto-container', '.info-row'] }
         };
 
         // Gerar PDF
@@ -5286,7 +5289,7 @@ function saveFormTeatro() {
     let obj = { id: equipamentoEmEdicao.tipo === 'teatro' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#teatro input, #teatro textarea, #teatro select').forEach(el => {
         if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
-            obj[el.id.replace('teatro-', '')] = el.value;
+            obj[el.id.replace('teatro-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
         }
     });
     
@@ -5331,7 +5334,7 @@ function saveFormAuditorio() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'auditorio' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#auditorio input, #auditorio textarea, #auditorio select').forEach(el => {
-        if (el.id) obj[el.id.replace('auditorio-', '')] = el.value;
+        if (el.id) obj[el.id.replace('auditorio-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
     });
     
     // Se está editando, atualizar; senão adicionar novo
@@ -5371,7 +5374,7 @@ function saveFormCasaCultura() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'casacultura' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#casacultura input, #casacultura textarea, #casacultura select').forEach(el => {
-        if (el.id) obj[el.id.replace('casacultura-', '')] = el.value;
+        if (el.id) obj[el.id.replace('casacultura-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
     });
     dados.casacultura.push(obj);
     saveData();
@@ -5396,7 +5399,7 @@ function saveForm(tipo) {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === tipo ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
-        if (el.id) obj[el.id.replace(tipo + '-', '')] = el.value;
+        if (el.id) obj[el.id.replace(tipo + '-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
     });
     
     // Se está editando, atualizar; senão adicionar novo
@@ -5431,7 +5434,7 @@ function saveFormGenerico() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'generico' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#generico input, #generico textarea, #generico select').forEach(el => {
-        if (el.id) obj[el.id.replace('generico-', '')] = el.value;
+        if (el.id) obj[el.id.replace('generico-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
     });
     
     // Se está editando, atualizar; senão adicionar novo
