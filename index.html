@@ -4197,6 +4197,12 @@ async function criarPastaMunicipio(nomeMunicipio) {
             const chaveMunicipio = municipioAtual.toLowerCase().trim();
             pastasMunicipio[chaveMunicipio] = dados.pastaId;
             localStorage.setItem('pastasMunicipio', JSON.stringify(pastasMunicipio));
+            // Também guarda no próprio município (mais confiável que depender só do mapa
+            // separado em localStorage, que pode ficar desatualizado)
+            if (municipios[chaveMunicipio]) {
+                municipios[chaveMunicipio].pastaId = dados.pastaId;
+                saveData();
+            }
             console.log(`✅ Pasta criada para ${nomeMunicipio}`, chaveMunicipio, dados.pastaId);
             showMsg('✅ Pasta criada no Google Drive!');
             return dados.pastaId;
@@ -5116,21 +5122,28 @@ async function salvarEquipamentoV3(tipo, obj) {
         const chaveSubpasta = `${municipioAtual}_${tipo}_${obj.id}`;
         console.log('📝 chaveSubpasta:', chaveSubpasta);
         let subpastasLocal = JSON.parse(localStorage.getItem('subpastasEquipamentos') || '{}');
-        let subpastaId = subpastasLocal[chaveSubpasta];
+        // O id da pasta é guardado tanto no próprio equipamento (obj.pastaId, viaja com os
+        // dados) quanto num mapa separado em localStorage (legado) — usamos o que existir,
+        // priorizando o do próprio equipamento por ser mais confiável.
+        let subpastaId = obj.pastaId || subpastasLocal[chaveSubpasta];
         console.log('subpastaId encontrada:', subpastaId);
-        
+
         // Criar subpasta se não existir
         if (!subpastaId) {
             console.log('📁 Criando subpasta...');
             subpastaId = await criarSubpastaEquipamento(tipo, obj.nome, pastasMunicipio[municipioAtual]);
             if (subpastaId) {
-                subpastasLocal[chaveSubpasta] = subpastaId;
-                localStorage.setItem('subpastasEquipamentos', JSON.stringify(subpastasLocal));
                 console.log('✅ Subpasta criada:', subpastaId);
             }
         }
-        
         if (subpastaId) {
+            // Persistir no próprio equipamento, para não depender só do mapa em
+            // localStorage (que pode ficar desatualizado ao limpar o navegador, trocar
+            // de dispositivo, etc.) — isso é o que a exclusão usa para achar a pasta certa.
+            obj.pastaId = subpastaId;
+            subpastasLocal[chaveSubpasta] = subpastaId;
+            localStorage.setItem('subpastasEquipamentos', JSON.stringify(subpastasLocal));
+
             // Upload de fotos (guarda o link do Drive de cada uma para usar no relatório)
             let fotosEnviadas = [];
             if (fotosTemporarias[tipo] && fotosTemporarias[tipo].length > 0) {
@@ -5769,10 +5782,12 @@ function updateLists() {
                 ev.preventDefault();
                 ev.stopPropagation();
                 console.log('Clicou em deletar:', t, e.id, e.nome);
-                // Recuperar pastaId da subpasta para deletar do Drive
+                // Recuperar pastaId da subpasta para deletar do Drive — prioriza o valor
+                // guardado no próprio equipamento (mais confiável) e cai para o mapa em
+                // localStorage (legado) se necessário
                 const chaveSubpasta = `${municipioAtual}_${t}_${e.id}`;
                 let subpastasLocal = JSON.parse(localStorage.getItem('subpastasEquipamentos') || '{}');
-                const pastaId = subpastasLocal[chaveSubpasta];
+                const pastaId = e.pastaId || subpastasLocal[chaveSubpasta];
                 console.log('🗑️ pastaId recuperada:', pastaId);
                 abrirModalConfirmar('equipamento', t, e.id, e.nome, pastaId);
             });
@@ -6083,6 +6098,8 @@ async function deleteEspacoConfirmado(t, id) {
     }
     
     // ✅ NOVO: Deletar do Google Drive também
+    let driveDeletado = false;
+    let avisoDrive = '';
     if (modalDados.pastaId) {
         console.log('🗑️ Deletando pasta do Google Drive:', modalDados.pastaId);
         try {
@@ -6102,23 +6119,29 @@ async function deleteEspacoConfirmado(t, id) {
             const resultado = await response.json();
             if (resultado.sucesso) {
                 console.log('✅ Pasta deletada do Google Drive');
+                driveDeletado = true;
             } else {
                 console.error('❌ Erro ao deletar pasta:', resultado.erro);
-                showMsg('⚠️ Aviso: Equipamento deletado localmente, mas houve erro ao deletar no Google Drive');
+                avisoDrive = '⚠️ Equipamento deletado localmente, mas houve erro ao deletar no Google Drive';
             }
         } catch (erro) {
             console.error('❌ Erro ao conectar com servidor:', erro);
-            showMsg('⚠️ Aviso: Equipamento deletado localmente, mas houve erro ao deletar no Google Drive');
+            avisoDrive = '⚠️ Equipamento deletado localmente, mas houve erro ao deletar no Google Drive';
         }
+    } else {
+        console.warn('⚠️ Nenhuma pastaId encontrada para este equipamento — pasta no Drive (se existir) NÃO foi apagada');
+        avisoDrive = '⚠️ Equipamento deletado localmente, mas a pasta no Google Drive não foi encontrada para apagar';
     }
-    
+
     // Deletar do localStorage
-    municipios[municipioAtual].equipamentos[t] = 
+    municipios[municipioAtual].equipamentos[t] =
         municipios[municipioAtual].equipamentos[t].filter(e => e.id !== id);
     dados = municipios[municipioAtual].equipamentos;
     saveData();
     updateLists();
-    showMsg('✓ Equipamento deletado com sucesso (local e Google Drive)!');
+    // A mensagem final reflete o que realmente aconteceu — nunca afirma sucesso no
+    // Drive se a exclusão lá falhou ou não pôde ser localizada.
+    showMsg(driveDeletado ? '✓ Equipamento deletado com sucesso (local e Google Drive)!' : avisoDrive);
 }
 
 async function deletarMunicipioConfirmado(chave) {
@@ -6130,10 +6153,13 @@ async function deletarMunicipioConfirmado(chave) {
     
     // ✅ Normalizar chave para minúsculas
     const chaveMunicipio = chave.toLowerCase().trim();
-    
-    // ✅ NOVO: Deletar a pasta do município do Google Drive
-    if (pastasMunicipio[chaveMunicipio]) {
-        const pastaId = pastasMunicipio[chaveMunicipio];
+
+    // ✅ NOVO: Deletar a pasta do município do Google Drive — prioriza o valor guardado
+    // no próprio município (mais confiável) e cai para o mapa em localStorage (legado)
+    const pastaId = municipios[chave]?.pastaId || pastasMunicipio[chaveMunicipio];
+    let driveDeletado = false;
+    let avisoDrive = '';
+    if (pastaId) {
         console.log('🗑️ Deletando pasta do município do Google Drive:', pastaId);
         try {
             const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
@@ -6152,14 +6178,20 @@ async function deletarMunicipioConfirmado(chave) {
             const resultado = await response.json();
             if (resultado.sucesso) {
                 console.log('✅ Pasta do município deletada do Google Drive');
+                driveDeletado = true;
             } else {
                 console.error('❌ Erro ao deletar pasta do município:', resultado.erro);
+                avisoDrive = '⚠️ Aviso: Município deletado localmente, mas houve erro ao deletar no Google Drive';
             }
         } catch (erro) {
             console.error('❌ Erro ao conectar com servidor:', erro);
+            avisoDrive = '⚠️ Aviso: Município deletado localmente, mas houve erro ao deletar no Google Drive';
         }
+    } else {
+        console.warn('⚠️ Nenhuma pastaId encontrada para este município — pasta no Drive (se existir) NÃO foi apagada');
+        avisoDrive = '⚠️ Município deletado localmente, mas a pasta no Google Drive não foi encontrada para apagar';
     }
-    
+
     // Deletar do localStorage
     delete municipios[chave];
     delete pastasMunicipio[chaveMunicipio];
@@ -6171,7 +6203,9 @@ async function deletarMunicipioConfirmado(chave) {
     atualizarDropdownMunicipios();
     const resumo = document.getElementById('resumo-municipio');
     if (resumo) resumo.style.display = 'none';
-    showMsg('✓ Município deletado com sucesso (local e Google Drive)!');
+    // A mensagem final reflete o que realmente aconteceu — nunca afirma sucesso no
+    // Drive se a exclusão lá falhou ou não pôde ser localizada.
+    showMsg(driveDeletado ? '✓ Município deletado com sucesso (local e Google Drive)!' : avisoDrive);
 }
 
 // Aguardar DOM estar pronto antes de carregar dados
