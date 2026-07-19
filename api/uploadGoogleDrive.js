@@ -119,11 +119,24 @@ async function deletarPasta(pastaId) {
     // dentro de um Drive Compartilhado não têm dono individual (a Service Account já
     // tem acesso suficiente para apagar o que ela mesma criou dentro do Drive), e a
     // API do Google rejeita role:"owner" para itens de Drive Compartilhado de qualquer forma.
-    await drive.files.delete({
-      fileId: pastaId,
-      supportsAllDrives: true,
-      supportsTeamDrives: true,
-    });
+    try {
+      await drive.files.delete({
+        fileId: pastaId,
+        supportsAllDrives: true,
+        supportsTeamDrives: true,
+      });
+    } catch (deleteError) {
+      // A pasta foi encontrada acima (files.get funcionou), mas o delete falhou.
+      // O Google costuma mascarar "sem permissão" como "não encontrado" em Drives
+      // Compartilhados — isso quase sempre significa que a Service Account não tem
+      // papel de "Gerente de conteúdo" (ou superior) no Drive Compartilhado.
+      console.error(`[API] ❌ Pasta existe mas não pôde ser deletada:`, deleteError.message);
+      throw new Error(
+        `A pasta existe mas não pôde ser apagada — provavelmente a Service Account não tem ` +
+        `permissão de exclusão nesse Drive Compartilhado (verifique se o papel dela lá é ` +
+        `"Gerente de conteúdo" ou "Gerente"). Erro original: ${deleteError.message}`
+      );
+    }
 
     console.log(`[API] ✅ Pasta ${pastaId} deletada com sucesso`);
     return { sucesso: true, mensagem: 'Pasta deletada com sucesso' };
