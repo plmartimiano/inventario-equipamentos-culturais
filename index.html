@@ -5909,7 +5909,9 @@ function deleteEspaco(t, id) {
 
 function showMsg(t) {
     document.getElementById('msg').innerHTML = '<div class="msg">' + t + '</div>';
-    setTimeout(() => { document.getElementById('msg').innerHTML = ''; }, 2500);
+    // Avisos de erro (⚠️) ficam mais tempo na tela, para dar tempo de ler o detalhe técnico
+    const duracao = t.includes('⚠️') ? 8000 : 2500;
+    setTimeout(() => { document.getElementById('msg').innerHTML = ''; }, duracao);
 }
 
 function exportJSON() {
@@ -6122,11 +6124,11 @@ async function deleteEspacoConfirmado(t, id) {
                 driveDeletado = true;
             } else {
                 console.error('❌ Erro ao deletar pasta:', resultado.erro);
-                avisoDrive = '⚠️ Equipamento deletado localmente, mas houve erro ao deletar no Google Drive';
+                avisoDrive = '⚠️ Equipamento deletado localmente, mas houve erro ao deletar no Google Drive: ' + (resultado.erro || 'erro desconhecido');
             }
         } catch (erro) {
             console.error('❌ Erro ao conectar com servidor:', erro);
-            avisoDrive = '⚠️ Equipamento deletado localmente, mas houve erro ao deletar no Google Drive';
+            avisoDrive = '⚠️ Equipamento deletado localmente, mas houve erro ao deletar no Google Drive: ' + erro.message;
         }
     } else {
         console.warn('⚠️ Nenhuma pastaId encontrada para este equipamento — pasta no Drive (se existir) NÃO foi apagada');
@@ -6181,11 +6183,11 @@ async function deletarMunicipioConfirmado(chave) {
                 driveDeletado = true;
             } else {
                 console.error('❌ Erro ao deletar pasta do município:', resultado.erro);
-                avisoDrive = '⚠️ Aviso: Município deletado localmente, mas houve erro ao deletar no Google Drive';
+                avisoDrive = '⚠️ Município deletado localmente, mas houve erro ao deletar no Google Drive: ' + (resultado.erro || 'erro desconhecido');
             }
         } catch (erro) {
             console.error('❌ Erro ao conectar com servidor:', erro);
-            avisoDrive = '⚠️ Aviso: Município deletado localmente, mas houve erro ao deletar no Google Drive';
+            avisoDrive = '⚠️ Município deletado localmente, mas houve erro ao deletar no Google Drive: ' + erro.message;
         }
     } else {
         console.warn('⚠️ Nenhuma pastaId encontrada para este município — pasta no Drive (se existir) NÃO foi apagada');
