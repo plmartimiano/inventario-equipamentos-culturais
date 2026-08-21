@@ -5955,7 +5955,9 @@ async function saveFormAuditorio() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'auditorio' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#auditorio input, #auditorio textarea, #auditorio select').forEach(el => {
-        if (el.id) obj[el.id.replace('auditorio-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
+            obj[el.id.replace('auditorio-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        }
     });
 
     // Se está editando, atualizar; senão adicionar novo
@@ -5995,7 +5997,9 @@ async function saveFormCasaCultura() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'casacultura' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#casacultura input, #casacultura textarea, #casacultura select').forEach(el => {
-        if (el.id) obj[el.id.replace('casacultura-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
+            obj[el.id.replace('casacultura-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        }
     });
 
     if (equipamentoEmEdicao.tipo === 'casacultura' && equipamentoEmEdicao.id) {
@@ -6034,7 +6038,9 @@ async function saveForm(tipo) {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === tipo ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#' + tipo + ' input, #' + tipo + ' textarea, #' + tipo + ' select').forEach(el => {
-        if (el.id) obj[el.id.replace(tipo + '-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
+            obj[el.id.replace(tipo + '-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        }
     });
 
     // Se está editando, atualizar; senão adicionar novo
@@ -6069,7 +6075,9 @@ async function saveFormGenerico() {
     // Se está editando, usar ID existente; senão criar novo
     let obj = { id: equipamentoEmEdicao.tipo === 'generico' ? equipamentoEmEdicao.id : Date.now(), nome: n };
     document.querySelectorAll('#generico input, #generico textarea, #generico select').forEach(el => {
-        if (el.id) obj[el.id.replace('generico-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        if (el.id && !el.id.includes('foto') && !el.id.includes('doc') && !el.id.includes('links')) {
+            obj[el.id.replace('generico-', '')] = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+        }
     });
 
     // Se está editando, atualizar; senão adicionar novo
@@ -6200,6 +6208,13 @@ function editarEspaco(tipo, id) {
         const fieldId = tipo + '-' + chave;
         const field = document.getElementById(fieldId);
         if (field) {
+            if (field.type === 'file') {
+                // Navegadores proíbem preencher um campo de arquivo por código (só
+                // aceitam ficar vazio) — pular aqui evita que a edição pare no meio
+                // caso o equipamento tenha sido salvo antes dessa proteção existir,
+                // com um valor de arquivo (ex: "C:\fakepath\...") gravado por engano.
+                return;
+            }
             if (field.type === 'checkbox') {
                 field.checked = equipamento[chave] === true || equipamento[chave] === 'true';
             } else {
