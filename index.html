@@ -5521,10 +5521,26 @@ async function salvarEquipamentoV3(tipo, obj) {
             const todasFotos = [...(fotosExistentes[tipo] || []), ...fotosEnviadas];
             const todosDocumentos = [...(documentosExistentes[tipo] || []), ...documentosEnviados];
 
+            // Reobtém a referência ATUAL do equipamento na árvore de dados, em vez de
+            // gravar direto em "obj". Entre o início do upload (que pode levar vários
+            // segundos) e este ponto, outro usuário pode ter salvo algo nesse meio-tempo —
+            // o listener em tempo real reconstrói "municipios"/"dados" a partir do
+            // Firestore quando isso acontece, e "obj" ficaria órfão (fora da árvore atual).
+            // Gravar nele faria a foto/documento sumir silenciosamente, mesmo já enviada
+            // com sucesso ao Drive.
+            const listaAtual = municipios[municipioAtual] && municipios[municipioAtual].equipamentos[tipo];
+            let objAtual = listaAtual ? listaAtual.find(e => e.id === obj.id) : null;
+            if (!objAtual) {
+                console.warn('⚠️ Equipamento não encontrado na árvore atual ao finalizar — reinserindo');
+                objAtual = obj;
+                if (listaAtual) listaAtual.push(objAtual);
+            }
+
             // Persistir no próprio equipamento (miniatura reduzida, não a foto original em
             // resolução cheia, para não inchar o localStorage)
-            obj.fotos = todasFotos.map(f => ({ descricao: f.descricao, nome: f.nome, link: f.link, base64: f.base64, largura: f.largura, altura: f.altura }));
-            obj.documentos = todosDocumentos.map(d => ({ descricao: d.descricao, nome: d.nome, link: d.link }));
+            objAtual.pastaId = subpastaId;
+            objAtual.fotos = todasFotos.map(f => ({ descricao: f.descricao, nome: f.nome, link: f.link, base64: f.base64, largura: f.largura, altura: f.altura }));
+            objAtual.documentos = todosDocumentos.map(d => ({ descricao: d.descricao, nome: d.nome, link: d.link }));
             saveData();
 
             fotosExistentes[tipo] = [];
@@ -5532,7 +5548,7 @@ async function salvarEquipamentoV3(tipo, obj) {
 
             // ✅ GERAR RELATÓRIO PDF (com todas as fotos/documentos, antigos e novos)
             console.log('📄 Gerando relatório PDF...');
-            await gerarRelatorioPDF(tipo, obj, subpastaId, todasFotos, todosDocumentos);
+            await gerarRelatorioPDF(tipo, objAtual, subpastaId, todasFotos, todosDocumentos);
         } else {
             console.error('❌ Não conseguiu criar ou recuperar subpastaId');
         }
