@@ -77,6 +77,13 @@
         <button id="btn-login-google" onclick="fazerLoginGoogle()" style="width:100%; padding:12px; background:#fff; color:#333; border:1px solid #ddd; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px;">
             🔑 Entrar com Google
         </button>
+        <div style="display:flex; align-items:center; gap:10px; margin:16px 0; color:#999; font-size:12px;">
+            <div style="flex:1; height:1px; background:#eee;"></div>ou<div style="flex:1; height:1px; background:#eee;"></div>
+        </div>
+        <button id="btn-login-visitante" onclick="fazerLoginVisitante()" style="width:100%; padding:12px; background:#f5f5f5; color:#555; border:1px dashed #bbb; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px;">
+            🧪 Testar sem login (dados de teste)
+        </button>
+        <p style="color:#999; font-size:11px; margin-top:8px;">No modo teste você pode usar todas as funções livremente — os dados ficam separados e não afetam os municípios reais.</p>
         <p id="login-carregando" style="color:#666; font-size:13px; margin-top:16px; display:none;">⏳ Verificando acesso...</p>
         <p id="login-msg" style="color:#dc3545; font-size:13px; margin-top:16px; font-weight:600;"></p>
     </div>
@@ -86,6 +93,10 @@
     <header>
         <h1>🎭 Inventário de Equipamentos Culturais</h1>
         <p class="subtitle">Mapeamento de Espaços Culturais</p>
+        <!-- Banner do Modo Teste -->
+        <div id="banner-modo-teste" style="display:none; background:#fff3cd; border:2px solid #ffc107; color:#856404; padding:8px 12px; border-radius:6px; margin-top:10px; text-align:center; font-weight:700; font-size:13px;">
+            🧪 MODO TESTE — os dados criados aqui são separados e não afetam os municípios reais
+        </div>
         <!-- Indicador de Município Atual -->
         <div id="municipio-indicador" style="background: #f0f8ff; padding: 8px 12px; border-radius: 6px; margin-top: 10px; text-align: center; font-weight: 600; color: #667eea; font-size: 14px; display: none;">
             📍 Município: <span id="municipio-nome-indicador"></span>
@@ -4221,6 +4232,13 @@ let db = null;
 let usuarioAtual = null;
 let pararSincronizacaoMunicipios = null;
 let primeiraSincronizacaoRecebida = false;
+// Modo teste: ativado quando alguém entra como Visitante (login anônimo), sem precisar
+// de conta Google nem autorização prévia. Nesse modo os dados vão para uma coleção
+// separada no Firestore ("municipios_teste"), isolada dos dados reais dos municípios —
+// a pessoa pode usar TODAS as funcionalidades livremente, sem risco de mexer em dados
+// de verdade.
+let modoTeste = false;
+let NOME_COLECAO_MUNICIPIOS = 'municipios';
 
 if (firebaseDisponivel) {
     firebase.initializeApp(firebaseConfig);
@@ -4243,12 +4261,28 @@ function fazerLoginGoogle() {
     });
 }
 
+// Login anônimo, para qualquer pessoa testar a ferramenta completa sem precisar de
+// conta Google nem autorização — os dados ficam isolados numa coleção de teste.
+function fazerLoginVisitante() {
+    if (!firebaseDisponivel) {
+        document.getElementById('login-msg').textContent = '⚠️ Não foi possível carregar o sistema de login. Verifique sua conexão com a internet e recarregue a página.';
+        return;
+    }
+    document.getElementById('login-msg').textContent = '';
+    auth.signInAnonymously().catch(erro => {
+        console.error('❌ Erro no login de visitante:', erro);
+        document.getElementById('login-msg').textContent = '⚠️ Erro ao entrar como visitante: ' + erro.message;
+    });
+}
+
 function fazerLogout() {
     if (pararSincronizacaoMunicipios) {
         pararSincronizacaoMunicipios();
         pararSincronizacaoMunicipios = null;
     }
     primeiraSincronizacaoRecebida = false;
+    modoTeste = false;
+    NOME_COLECAO_MUNICIPIOS = 'municipios';
     if (auth) auth.signOut();
 }
 
@@ -4263,8 +4297,10 @@ function esconderTelaLoginEMostrarApp() {
     const indicador = document.getElementById('usuario-logado-indicador');
     if (indicador && usuarioAtual) {
         indicador.style.display = 'flex';
-        document.getElementById('usuario-logado-email').textContent = usuarioAtual.email;
+        document.getElementById('usuario-logado-email').textContent = modoTeste ? 'Visitante (modo teste)' : usuarioAtual.email;
     }
+    const bannerTeste = document.getElementById('banner-modo-teste');
+    if (bannerTeste) bannerTeste.style.display = modoTeste ? 'block' : 'none';
 }
 
 // Remove recursivamente campos "undefined" de um objeto/array — o Firestore rejeita
@@ -4298,7 +4334,7 @@ async function sincronizarMunicipiosParaFirestore() {
         const lote = db.batch();
         const chaves = Object.keys(municipios);
         chaves.forEach(chave => {
-            const ref = db.collection('municipios').doc(chave);
+            const ref = db.collection(NOME_COLECAO_MUNICIPIOS).doc(chave);
             lote.set(ref, removerUndefinedRecursivo(municipios[chave]));
         });
         await lote.commit();
@@ -4316,12 +4352,12 @@ function iniciarSincronizacaoMunicipios() {
     if (pararSincronizacaoMunicipios) { console.log('[SYNC] Listener já estava ativo, ignorando nova chamada'); return; }
 
     console.log('[SYNC] Iniciando listener em tempo real na coleção "municipios"...');
-    pararSincronizacaoMunicipios = db.collection('municipios').onSnapshot((snapshot) => {
+    pararSincronizacaoMunicipios = db.collection(NOME_COLECAO_MUNICIPIOS).onSnapshot((snapshot) => {
         const municipiosAtualizados = {};
         snapshot.forEach(doc => { municipiosAtualizados[doc.id] = doc.data(); });
         console.log('[SYNC] Snapshot recebido —', Object.keys(municipiosAtualizados).length, 'município(s):', Object.keys(municipiosAtualizados), '| fromCache:', snapshot.metadata.fromCache, '| hasPendingWrites:', snapshot.metadata.hasPendingWrites);
         municipios = municipiosAtualizados;
-        localStorage.setItem('municipios', JSON.stringify(municipios)); // cache local
+        localStorage.setItem(modoTeste ? 'municipios_teste' : 'municipios', JSON.stringify(municipios)); // cache local
 
         if (!primeiraSincronizacaoRecebida) {
             primeiraSincronizacaoRecebida = true;
@@ -4355,6 +4391,19 @@ if (firebaseDisponivel) {
             return;
         }
 
+        // Visitante (login anônimo): não passa pela lista de autorizados — é
+        // automaticamente liberado, mas só enxerga/edita a coleção de teste.
+        if (user.isAnonymous) {
+            modoTeste = true;
+            NOME_COLECAO_MUNICIPIOS = 'municipios_teste';
+            usuarioAtual = user;
+            document.getElementById('login-msg').textContent = '';
+            document.getElementById('login-carregando').style.display = 'none';
+            esconderTelaLoginEMostrarApp();
+            iniciarSincronizacaoMunicipios();
+            return;
+        }
+
         const email = user.email.toLowerCase();
         document.getElementById('login-msg').textContent = '';
         document.getElementById('login-carregando').style.display = 'block';
@@ -4375,6 +4424,8 @@ if (firebaseDisponivel) {
             return;
         }
 
+        modoTeste = false;
+        NOME_COLECAO_MUNICIPIOS = 'municipios';
         usuarioAtual = user;
         document.getElementById('login-carregando').style.display = 'none';
         esconderTelaLoginEMostrarApp();
@@ -4389,9 +4440,13 @@ if (firebaseDisponivel) {
 // Criar pasta para município no Google Drive
 async function criarPastaMunicipio(nomeMunicipio) {
     try {
-        console.log('📍 Iniciando criação de pasta:', nomeMunicipio);
+        // O Drive é o mesmo para todo mundo (não dá pra isolar como o Firestore sem
+        // reconfigurar o backend) — então, no modo teste, marcamos a pasta com um
+        // prefixo bem visível, pra nunca ficar parecendo um município real.
+        const nomePastaFinal = modoTeste ? `🧪 TESTE - ${nomeMunicipio}` : nomeMunicipio;
+        console.log('📍 Iniciando criação de pasta:', nomePastaFinal);
         console.log('🔗 URL:', `${SERVIDOR_URL}/api/uploadGoogleDrive`);
-        
+
         const response = await fetch(`${SERVIDOR_URL}/api/uploadGoogleDrive`, {
             method: 'POST',
             headers: {
@@ -4400,7 +4455,7 @@ async function criarPastaMunicipio(nomeMunicipio) {
             },
             body: JSON.stringify({
                 acao: 'criar-pasta',
-                nomePasta: nomeMunicipio,
+                nomePasta: nomePastaFinal,
                 pastaParentId: GOOGLE_DRIVE_CONFIG.PASTA_MAE_ID
             }),
             mode: 'cors'
@@ -5742,7 +5797,7 @@ function loadData() {
 // fallback caso a conexão caia) e no Firestore (fonte compartilhada — é isso que faz
 // outros aparelhos/usuários verem o que foi preenchido aqui).
 function saveData() {
-    localStorage.setItem('municipios', JSON.stringify(municipios));
+    localStorage.setItem(modoTeste ? 'municipios_teste' : 'municipios', JSON.stringify(municipios));
     sincronizarMunicipiosParaFirestore();
 }
 
@@ -5755,7 +5810,7 @@ function saveData() {
 // servidor SEM fotos/documentos ainda — desconectando a referência "obj" da árvore antes dela
 // ser preenchida, e fazendo as fotos/documentos sumirem do relatório e do banco.
 function salvarLocalmente() {
-    localStorage.setItem('municipios', JSON.stringify(municipios));
+    localStorage.setItem(modoTeste ? 'municipios_teste' : 'municipios', JSON.stringify(municipios));
 }
 
 function mostrarAbasEquipamentos() {
@@ -6522,7 +6577,7 @@ async function deletarMunicipioConfirmado(chave) {
     // outros aparelhos na próxima sincronização).
     if (firebaseDisponivel && db) {
         try {
-            await db.collection('municipios').doc(chave).delete();
+            await db.collection(NOME_COLECAO_MUNICIPIOS).doc(chave).delete();
         } catch (erroFirestore) {
             console.error('❌ Erro ao remover município do Firestore compartilhado:', erroFirestore);
         }
